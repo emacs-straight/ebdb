@@ -32,7 +32,8 @@
 (eval-and-compile
   (autoload 'build-mail-aliases "mailalias")
   (autoload 'browse-url-url-at-point "browse-url")
-  (autoload 'eieio-customize-object "eieio-custom"))
+  (autoload 'eieio-customize-object "eieio-custom")
+  (autoload 'message-goto-body "message"))
 
 (require 'crm)
 (defvar ebdb-crm-local-completion-map
@@ -302,6 +303,7 @@ display information."
 
     (define-key km (kbd "o")		'ebdb-omit-records)
     (define-key km (kbd "m")		'ebdb-mail)
+    (define-key km (kbd "M")		'ebdb-mail-each)
     (define-key km (kbd "M-d")		'ebdb-dial)
     (define-key km (kbd "h")		'ebdb-info)
     (define-key km (kbd "?")		'ebdb-help)
@@ -1844,7 +1846,7 @@ Also redisplays it after customization."
   "Handle mail priority after customizing.
 Check that some mail is marked as primary after MAIL is edited."
   (let* ((rec ebdb-customization-record)
-	 (all-mails (remove mail (ebdb-record-mail rec)))
+	 (all-mails (remove mail (ebdb-record-mail rec t)))
 	 (primaries (when rec (seq-filter
 			       (lambda (m)
 				 (eq (slot-value m 'priority) 'primary))
@@ -2323,21 +2325,77 @@ the record to be displayed or nil otherwise."
 ;;;###autoload
 (defun ebdb-mail (records &optional subject arg)
   "Compose a mail message to RECORDS (optional: using SUBJECT).
-If ARG (interactively, the prefix arg) is nil, use the first mail
-address of each record.  If it is t, prompt the user for which
-address to use.
+If ARG (interactively, the prefix arg) is nil, use the primary
+mail address of each record.  If it is t, prompt the user for
+which address to use.
 
 Another approach is to put point on a mail field and press \"a\",
 for `ebdb-field-action'."
   (interactive (list (ebdb-do-records) nil
-                     (or (consp current-prefix-arg)
-                         current-prefix-arg)))
+                     current-prefix-arg))
   (setq records (ebdb-record-list records))
-  (let ((to (mapconcat
-	     (lambda (r) (ebdb-dwim-mail r (when arg (ebdb-prompt-for-mail r))))
-	     records ", ")))
-    (unless (string= "" to)
-      (ebdb-compose-mail to subject))))
+  (if (= 1 (length records))
+      (let ((mail (ebdb-record-one-mail (car records) arg)))
+	(unless mail (error "Record has no mail address"))
+	(ebdb-field-mail-compose (car records) mail subject))
+   (let ((to (mapconcat
+	      (lambda (r) (ebdb-dwim-mail
+			   r (ebdb-record-one-mail r arg)))
+	      records ", ")))
+     (unless (string= "" to)
+       (ebdb-compose-mail to subject)))))
+
+;;;###autoload
+(defun ebdb-mail-each (records prompt subject cc bcc body-register)
+  "Compose a separate email to each of the records in RECORDS.
+RECORDS is either the marked records in an *EBDB* buffer, or (if
+no records are marked) all the records in the buffer.  If PROMPT
+is non-nil, prompt the user to choose a mail address to use for
+each record that has more than one.  SUBJECT is the subject to
+use for each message.  CC is a list of address strings to put in
+the Cc field of each message.  BCC likewise, for the Bcc field.
+BODY-REGISTER, if given, is a character indicating a register
+holding text to be inserted as the body of each message."
+  (interactive
+   (list (or (seq-filter (lambda (r) (nth 3 r)) ebdb-records)
+	     (mapcar #'car ebdb-records))
+	 current-prefix-arg
+	 (ebdb-with-exit (ebdb-read-string "Subject header (C-g to skip): "))
+	 (ebdb-loop-with-exit
+	  (ebdb-dwim-mail
+	   (ebdb-prompt-for-record
+	    nil nil "Add record to Cc (C-g to skip): ")))
+	 (ebdb-loop-with-exit
+	  (ebdb-dwim-mail
+	   (ebdb-prompt-for-record
+	    nil nil "Add record to Bcc (C-g to skip): ")))
+	 (let ((usable-registers
+		(seq-filter (lambda (pair) (stringp (cdr pair)))
+			    register-alist)))
+	   (when usable-registers
+	     (ebdb-with-exit
+	      (read-char-choice
+	       "Register to use for body text (C-g to skip): "
+	       (mapcar #'car usable-registers)))))))
+  (let ((cc (when cc (mapconcat #'identity cc ", ")))
+	(bcc (when bcc (mapconcat #'identity bcc ", ")))
+	(body (let ((reg (get-register body-register)))
+		(when (stringp reg)
+		  reg)))
+	headers)
+    (when cc
+      (push (cons "Cc" cc) headers))
+    (when bcc
+      (push (cons "Bcc" bcc) headers))
+    (dolist (rec records)
+      (funcall #'ebdb-field-mail-compose
+	       rec (ebdb-record-one-mail rec prompt)
+	       subject headers)
+      (when body
+	(message-goto-body)
+	(save-excursion
+	  ;; `register-val-insert' is too new.
+	  (insert-for-yank body))))))
 
 ;;; Citing
 
@@ -2548,7 +2606,7 @@ as part of the MUA insinuation."
         (let ((completion-list (if (eq t ebdb-completion-list)
                                    '(name alt-names mail aka organization)
                                  ebdb-completion-list))
-              (mails (ebdb-record-mail one-record t))
+              (mails (ebdb-record-mail one-record))
               mail elt)
           (if (not mails)
               (progn
@@ -2610,7 +2668,7 @@ as part of the MUA insinuation."
           ;; Add it if the mail is part of the completions
           (dolist (key all-completions)
             (dolist (record (gethash key ebdb-hashtable))
-              (let ((mails (ebdb-record-mail record t))
+              (let ((mails (ebdb-record-mail record))
                     accept)
                 (when mails
                   (dolist (field completion-list)
@@ -2668,7 +2726,7 @@ as part of the MUA insinuation."
         (if (and record
                  (setq dwim-completions
                        (mapcar (lambda (m) (ebdb-dwim-mail record m))
-                               (ebdb-record-mail record t))))
+                               (ebdb-record-mail record))))
             (cond ((and (= 1 (length dwim-completions))
                         (string= orig (car dwim-completions)))
                    (setq done 'unchanged))
@@ -2991,9 +3049,7 @@ With prefix argument ARG, prompt for which mail address to use."
 		     current-prefix-arg))
   (let* (mail-list mail result)
     (dolist (r records)
-      (setq mail (if arg
-	       (ebdb-prompt-for-mail r)
-	       (car-safe (ebdb-record-mail r t))))
+      (setq mail (ebdb-record-one-mail r arg))
       (when mail
 	(push (cons r mail) mail-list)))
     (setq result

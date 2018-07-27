@@ -430,12 +430,21 @@ possible to manually create the buffer using interactive commands (see
 below).
 #+end_defopt
 
+#+ATTR_TEXINFO: :options ebdb-mua-default-formatter
+#+begin_defopt
+The default formatter to use for MUA pop-up buffers.  The value of
+this option should be an instance of ~ebdb-formatter-ebdb~; it
+defaults to ~ebdb-default-multiline-formatter~.  Other likely options
+would be the value of ~ebdb-default-oneline-formatter~, or a
+custom-made formatter, see [[id:20fc7a2a-55a9-43ef-9534-9e5887682a88][Customizing Record Display]].
+#+end_defopt
+
 EBDB can also integrate with atomic windows (@@texinfo:@xref{Atomic
 Windows,,,elisp}@@).
 
 #+ATTR_TEXINFO: :options ebdb-join-atomic-windows
 #+begin_defopt
-When non-nil (the defaul), EBDB buffers that are popped up within
+When non-nil (the default), EBDB buffers that are popped up within
 existing atomic windows will become part of the atomic buffer.
 Otherwise they will be opened to one side of the atomic window.
 #+end_defopt
@@ -694,6 +703,45 @@ string provided by Gnus, and adding the EBDB-specific format code:
 Format letter to use in the summary buffer format string to mark a
 record.  Defaults to "e".
 #+END_defopt
+* Specific MUAs
+** Gnus
+EBDB has a little more support for Gnus than the other MUAs, for no
+other reason than that Gnus is what the author uses.
+*** Posting Styles
+Gnus provides a "posting styles" mechanism which allows the user to
+set up specific mail composition styles (custom headers and
+signatures, etc) when writing mails to certain recipients.  The
+mechanism examines Gnus group names to determine which styles to use.
+EBDB can fake this mechanism so that different styles are used when
+composing messages to different records.
+
+#+attr_texinfo: :options ebdb-gnus-post-style-function
+#+BEGIN_defopt
+Set this option to a callable which accepts two arguments, a record
+instance and a mail instance.  The callable should examine these
+arguments and return the string name of a Gnus group to use for
+looking up posting styles, or nil to use Gnus' defaults.
+#+END_defopt
+
+When writing this function, functions such as ~ebdb-record-field~ and
+~ebdb-record-current-fields~ may come in handy.  Here's a less-obvious
+example that dispatches styles depending on which database the record
+belongs to:
+
+#+BEGIN_SRC elisp
+  (setq ebdb-gnus-post-style-function
+        (lambda (rec _mail)
+          (let ((dbs (slot-value (ebdb-record-cache rec) 'database)))
+            (if (object-assoc "File: work.dat" 'label dbs)
+                "nnimap+WorkAccount:INBOX"
+              "nnimap+PersonalAccount:INBOX"))))
+#+END_SRC
+
+A current limitation of this functionality is that it only works when
+composing a mail to a single recipient.  If you mark several records
+in a {{{buf(EBDB)}}} buffer and compose a mail to them collectively,
+the mechanism will be bypassed.
+
 * EBDB Buffers
 :PROPERTIES:
 :ID:       877ca77a-06d6-4fbf-87ec-614d03c37e30
@@ -908,6 +956,20 @@ keybindings apply.
      Begin composing a message to the record under point
      (~ebdb-mail~).  With a prefix arg, prompt for the mail address to
      use; otherwise use the record's primary address.
+- M ::
+
+     #+KINDEX: M
+     #+FINDEX: ebdb-mail-each
+     Begin composing a separate message to each marked record in the
+     current {{{buf(EBDB)}} buffer, or all records in the buffer if
+     none are marked.  In addition, prompt for a common subject header
+     line to use for each message, as well as records to add to the
+     "Cc" and "Bcc" headers.  Then optionally prompt for a character,
+     interpreted as the name of a register.  If that register contains
+     text, insert the text as the body of each message.
+
+     This function works as a sort of poor-man's mail merge; it lacks
+     the ability to interpolate variables in the body text.
 
 - t ::
 
