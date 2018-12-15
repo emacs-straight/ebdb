@@ -503,11 +503,15 @@ and 'role, and the special shortcuts 'mail-primary,
   "Formatter used for displaying all values of a record.
 This formatter should not be changed.")
 
-(defun ebdb-available-ebdb-formatters ()
+(defun ebdb-available-ebdb-formatters (&optional full-okay)
   "A list of formatters available in the *EBDB* buffer.
-This list is also used for toggling layouts."
+This list is also used for toggling layouts.  Unless FULL-OKAY is
+non-nil, do not offer the value of `ebdb-full-formatter' as a
+choice: that formatter should be selected explicitly."
   (seq-filter
-   (lambda (f) (object-of-class-p f 'ebdb-formatter-ebdb))
+   (lambda (f) (and (object-of-class-p f 'ebdb-formatter-ebdb)
+		    (or full-okay
+			(null (equal f ebdb-full-formatter)))))
    ebdb-formatter-tracker))
 
 (defsubst ebdb-formatter-prefix ()
@@ -637,6 +641,21 @@ Print the first line, add an ellipsis, and add a tooltip."
       (if defunct
 	  (propertize value 'face 'ebdb-role-defunct)
 	value))))
+
+(cl-defmethod ebdb-fmt-field ((_fmt ebdb-formatter-ebdb)
+			      (field ebdb-field-image)
+			      _style
+			      (record ebdb-record))
+  (if (display-images-p)
+      (progn
+	(require 'image)
+	(propertize
+	 " "
+	 ;; Cribbed from `insert-image'.
+	 (list 'display (ebdb-field-image-get field record)
+               'rear-nonsticky '(display)
+               'keymap image-map)))
+    "<img>"))
 
 (defsubst ebdb-indent-string (string column)
   "Indent nonempty lines in STRING to COLUMN (except first line).
@@ -827,7 +846,8 @@ name based on the current major mode."
 	;; When appending, we want point to end up on the first of the
 	;; appended records.  Save the uuid, and later point a marker
 	;; at it.  Mostly useful for `follow-related'.
-	(target-record-uuid (ebdb-record-uuid (car records)))
+	(target-record-uuid (when records
+			      (ebdb-record-uuid (car records))))
 	target-record-marker)
 
     (with-current-buffer (get-buffer-create target-buffer)
