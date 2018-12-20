@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2016-2018  Free Software Foundation, Inc.
 
-;; Version: 0.6.1
+;; Version: 0.6.2
 ;; Package-Requires: ((emacs "25.1") (cl-lib "0.5") (seq "2.15"))
 
 ;; Maintainer: Eric Abrahamsen <eric@ericabrahamsen.net>
@@ -2827,7 +2827,7 @@ by the field, or else raising the error `ebdb-related-unfound'.")
 (cl-defmethod ebdb-record-related ((_record ebdb-record)
 				   (_field ebdb-field))
   "Provide a base method that raises `ebdb-related-unfound'."
-  (signal 'ebdb-related-unfound))
+  (signal 'ebdb-related-unfound '("Related record not found")))
 
 ;; The following functions are here because they need to come after
 ;; `ebdb-record' has been defined.
@@ -5141,6 +5141,37 @@ additionally prompt to save each database individually."
 
 (defvar ebdb-search-invert nil
   "Bind to t to invert the result of `ebdb-search'.")
+
+(defun ebdb-parse-search-string (str)
+  "Parse STR as a search on multiple fields.
+STR should contain some number of <key>:<value> pairs, where key
+is the name of a field class, or a field class shortcut such as
+\"name\" or \"mail\", and the value is an arbitrary string value
+to search on.
+
+Values containing spaces should be enclosed in double quotes.
+
+Returns a list of (field value) pairs suitable for searching."
+  (let (parsed)
+    (with-temp-buffer
+      (insert str)
+      (goto-char (point-min))
+      (skip-syntax-forward " ")
+      (while (re-search-forward
+	      "\\([[:ascii:]-]+\\):\\(?:\"\\(?2:[^\"]+\\)\"\\|\\(?2:[^[:space:]]+\\)\\)"
+	      (point-max) t)
+	(let* ((key-string (match-string 1))
+	       (sym (or (and (string-match-p "ebdb-field-" key-string)
+			     (intern-soft key-string))
+			(intern-soft (format "ebdb-field-%s" key-string)))))
+	  (if (and (class-p sym)
+		   (child-of-class-p sym 'ebdb-field))
+	      (push (list sym
+			  (match-string 2))
+		    parsed)
+	    (signal 'ebdb-unparseable
+		    (list "Invalid search key" key-string))))))
+    parsed))
 
 ;; Char folding: a simplified version of what happens in char-fold.el.
 
