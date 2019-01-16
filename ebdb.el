@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2016-2018  Free Software Foundation, Inc.
 
-;; Version: 0.6.2
+;; Version: 0.6.3
 ;; Package-Requires: ((emacs "25.1") (cl-lib "0.5") (seq "2.15"))
 
 ;; Maintainer: Eric Abrahamsen <eric@ericabrahamsen.net>
@@ -45,6 +45,7 @@
 (require 'timezone)
 (require 'cl-lib)
 (require 'seq)
+(require 'map)
 (require 'calendar)
 (require 'subr-x)
 (require 'pcase)
@@ -4832,25 +4833,28 @@ also be one of the special symbols below.
  affix         Return the list of affixes
  aka-all       Return the list of AKAs plus mail-akas.
  mail-aka      Return the list of name parts in mail addresses
+ mail-primary  Return the record's primary mail address
  mail-canon    Return the list of canonical mail addresses.")
 
 (cl-defmethod ebdb-record-field ((record ebdb-record)
 				 (field symbol))
-  (cond ((eq field 'firstname) (ebdb-record-firstname record))
-	((eq field 'lastname) (ebdb-record-lastname record))
-	((eq field 'affix)    (slot-value (slot-value record 'name) 'affix))
-	((eq field 'mail-canon) (ebdb-record-mail-canon record)) ; derived (cached) field
-	;; Mail is special-cased, because mail addresses can come from
-	;; more than one slot.
-	((eq field 'mail) (ebdb-record-mail record nil nil t))
-	((eq field 'mail-aka) (ebdb-record-mail-aka record)) ; derived (cached) field
-	((eq field 'aka-all)  (append (ebdb-record-aka record) ; derived field
-				      (ebdb-record-mail-aka record)))
-	;; Otherwise assume it is a valid slot name.
-	(t
-	 (when (and (slot-exists-p record field)
-		    (slot-boundp record field))
-	   (slot-value record field)))))
+  (pcase field
+    ('firstname (ebdb-record-firstname record))
+    ('lastname (ebdb-record-lastname record))
+    ('affix    (slot-value (slot-value record 'name) 'affix))
+    ('mail-canon (ebdb-record-mail-canon record)) ; derived (cached) field
+    ;; Mail is special-cased, because mail addresses can come from
+    ;; more than one slot.
+    ('mail (ebdb-record-mail record nil nil t))
+    ('mail-primary (ebdb-record-one-mail record nil t))
+    ('mail-aka (ebdb-record-mail-aka record)) ; derived (cached) field
+    ('aka-all  (append (ebdb-record-aka record) ; derived field
+		       (ebdb-record-mail-aka record)))
+    ;; Otherwise assume it is a valid slot name.
+    (_
+     (when (and (slot-exists-p record field)
+		(slot-boundp record field))
+       (slot-value record field)))))
 
 (cl-defmethod ebdb-record-field ((record ebdb-record)
 				 (f-class (subclass ebdb-field-user)))

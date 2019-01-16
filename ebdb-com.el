@@ -28,7 +28,6 @@
 (require 'ebdb)
 (require 'ebdb-format)
 (require 'mailabbrev)
-(require 'map)
 
 (eval-and-compile
   (autoload 'build-mail-aliases "mailalias")
@@ -396,7 +395,7 @@ position-marker mark)."
 
 ;;; *EBDB* formatting
 
-(defclass ebdb-formatter-ebdb (ebdb-formatter)
+(defclass ebdb-formatter-ebdb (ebdb-formatter-freeform)
   ;; This post-format-function only comes into play when the user
   ;; chooses the EBDB format in `ebdb-format-to-tmp-buffer'.
   ((post-format-function
@@ -538,18 +537,21 @@ choice: that formatter should be selected explicitly."
 (cl-defmethod ebdb-fmt-field-label :around ((_fmt ebdb-formatter-ebdb)
 					    _field
 					    _style
+					    &optional
 					    (_record ebdb-record))
   (propertize (cl-call-next-method) 'face 'ebdb-label))
 
 (cl-defmethod ebdb-fmt-field-label ((_fmt ebdb-formatter-ebdb)
 				    (field ebdb-field-phone)
 				    (_style (eql oneline))
+				    &optional
 				    (_record ebdb-record))
   (format "phone (%s)" (ebdb-field-label field)))
 
 (cl-defmethod ebdb-fmt-field-label ((_fmt ebdb-formatter-ebdb)
 				    (field ebdb-field-address)
 				    (_style (eql oneline))
+				    &optional
 				    (_record ebdb-record))
   (format "address (%s)" (ebdb-field-label field)))
 
@@ -668,27 +670,7 @@ Print the first line, add an ellipsis, and add a tooltip."
 
 (cl-defmethod ebdb-fmt-record ((fmt ebdb-formatter-ebdb)
 			       (record ebdb-record))
-  (pcase-let* ((header-classes (cdr (assoc (eieio-object-class-name record)
-					   (slot-value fmt 'header))))
-	       ((map header-fields body-fields)
-		(seq-group-by
-		 (lambda (f)
-		   ;; FIXME: Consider doing the header/body split in
-		   ;; `ebdb-fmt-process-fields', we've already got the
-		   ;; formatter there.
-		   (if (ebdb-foo-in-list-p (alist-get 'class f)
-					   header-classes)
-		       'header-fields
-		     'body-fields))
-		 (ebdb-fmt-process-fields
-		  fmt record
-		  (ebdb-fmt-sort-fields
-		   fmt record
-		   (ebdb-fmt-collect-fields
-		    fmt record))))))
-    (concat
-     (ebdb-fmt-record-header fmt record header-fields)
-     (ebdb-fmt-compose-fields fmt record body-fields 1))))
+  (concat (cl-call-next-method) "\n"))
 
 (cl-defmethod ebdb-fmt-record-header ((fmt ebdb-formatter-ebdb)
 				      (record ebdb-record)
@@ -715,6 +697,11 @@ Print the first line, add an ellipsis, and add a tooltip."
 				 (ebdb-fmt-field fmt f style record))
 			       inst " "))
 		  header-fields " "))))))
+
+(cl-defmethod ebdb-fmt-record-header :around ((fmt ebdb-formatter-ebdb-multiline)
+					      (record ebdb-record)
+					      &optional header-fields)
+  (concat (cl-call-next-method) "\n"))
 
 (cl-defmethod ebdb-fmt-compose-fields ((fmt ebdb-formatter-ebdb-multiline)
 				       (record ebdb-record)
@@ -760,7 +747,6 @@ string."
 	   (fill-column (window-body-width)))
       (with-current-buffer (get-buffer-create "format test")
 	(erase-buffer)
-	(insert "\n")
 	(mapc
 	 (pcase-lambda (`(,label . ,fields))
 	   (let ((start (point)))
@@ -784,7 +770,6 @@ string."
 	      (when ebdb-fill-field-values
 		(fill-region start (point))))))
 	 field-pairs)
-	(insert "\n")
 	(buffer-string)))))
 
 (cl-defmethod ebdb-fmt-compose-fields ((fmt ebdb-formatter-ebdb-oneline)
@@ -797,8 +782,7 @@ string."
       (mapconcat (pcase-lambda ((map inst style))
 		   (mapconcat (lambda (f) (ebdb-fmt-field fmt f style record))
 			      inst " "))
-		 field-list ", ")))
-   "\n"))
+		 field-list ", ")))))
 
 (cl-defgeneric ebdb-make-buffer-name (&context (major-mode t))
   "Return the buffer to be used by EBDB.
@@ -2366,8 +2350,7 @@ If ARG (interactively, the prefix arg) is nil, use the primary
 mail address of each record.  If it is t, prompt the user for
 which address to use.
 
-Another approach is to put point on a mail field and press \"a\",
-for `ebdb-field-action'."
+\\<ebdb-mode-map>Another approach is to put point on a mail field and press \\[ebdb-record-action]."
   (interactive (list (ebdb-do-records) nil
                      current-prefix-arg))
   (setq records (ebdb-record-list records))
@@ -3023,7 +3006,7 @@ message."
   (interactive
    (list (ebdb-prompt-for-formatter)
 	 (ebdb-do-records)))
-  (let ((buf (generate-new-buffer
+  (let ((buf (get-buffer-create
 	      (slot-value formatter 'format-buffer-name)))
 	(fmt-coding (slot-value formatter 'coding-system))
 	(ebdb-p (object-of-class-p formatter 'ebdb-formatter-ebdb)))
