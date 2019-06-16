@@ -59,7 +59,6 @@
   "Make *EBDB* window a dedicated window.
 Allowed values include nil (not dedicated) 'ebdb (weakly dedicated)
 and t (strongly dedicated)."
-  :group 'ebdb-record-display
   :type '(choice (const :tag "EBDB window not dedicated" nil)
                  (const :tag "EBDB window weakly dedicated" ebdb)
                  (const :tag "EBDB window strongly dedicated" t)))
@@ -68,12 +67,17 @@ and t (strongly dedicated)."
   "When non-nil, have EBDB buffers join atomic windows.
 Atomic windows are window groups that are treated as single
 windows by other splitting/display code."
-  :group 'ebdb-record-display
   :type 'boolean)
+
+(defcustom ebdb-default-window-size 0.4
+  "Default size of EBDB popup windows.
+Specified as a float between 0 and 1, which is interpreted as a
+fractional size of the window that is being split to make way for
+the *EBDB* buffer."
+  :type 'float)
 
 (defcustom ebdb-fill-field-values t
   "When non-nil, fill long field values."
-  :group 'ebdb-record-display
   :type '(choice (const :tag "Always fill" nil)
                  (const :tag "Never fill" t)))
 
@@ -83,12 +87,10 @@ This should be a list of menu entries.
 When set to a function, it is called with two arguments RECORD and FIELD
 and it should either return nil or a list of menu entries.
 Used by `ebdb-mouse-menu'."
-  :group 'ebdb-record-display
   :type 'sexp)
 
 (defcustom ebdb-display-hook nil
   "Hook run after the *EBDB* is filled in."
-  :group 'ebdb-record-display
   :type 'hook)
 
 ;; Faces for font-lock
@@ -101,7 +103,6 @@ Used by `ebdb-mouse-menu'."
 				  (ebdb-record-organization . ebdb-organization-name))
   "Alist of record class types to the face names.
 Faces are used to font-lock their names in the *EBDB* buffer."
-  :group 'ebdb-faces
   :type '(repeat (cons (ebdb-record :tag "Record type") (face :tag "Face"))))
 
 (defface ebdb-person-name
@@ -262,6 +263,7 @@ display information."
     (define-key km (kbd "A")		'ebdb-mail-aliases)
     (define-key km (kbd "c")		'ebdb-create-record)
     (define-key km (kbd "C")		'ebdb-create-record-extended)
+    (define-key km (kbd "R")            'ebdb-create-record-and-role)
     (define-key km (kbd "e")		'ebdb-edit-field)
     (define-key km (kbd "E")		'ebdb-edit-field-customize)
     (define-key km (kbd ";")		'ebdb-edit-foo)
@@ -280,7 +282,7 @@ display information."
 
     (define-key km (kbd "r")		'ebdb-reformat-records)
     (define-key km (kbd "f")		'ebdb-format-to-tmp-buffer)
-    (define-key km (kbd "F")		'ebdb-format-all-records)
+    (define-key km (kbd "F")		'ebdb-format-these-records)
     (define-key km (kbd "I")            'ebdb-cite-records-ebdb)
     (define-key km (kbd "C-k")		'ebdb-delete-field-or-record)
     (define-key km (kbd "i")		'ebdb-insert-field)
@@ -797,27 +799,31 @@ buffer."
 
 (cl-defgeneric ebdb-popup-window (major-mode)
   "Return a spec for how to pop up a window on an *EBDB* buffer.
-
 This generic function dispatches on the current value of
-major-mode.  The return value should be a two-element list
-of (window split), in which WINDOW is the window to split, and
-SPLIT is either an integer, specifying number of rows/columns, or
-a float specifying what percentage of window real estate the
-pop-up should occupy.  SPLIT can also be nil, in which case the
-window will probably take up half the available space.
+major-mode.  The return value should be a three-element list
+of (window split direction), in which WINDOW is the window to
+split, SPLIT is either an integer, specifying number of
+rows/columns, or a float specifying what percentage of window
+real estate the pop-up should occupy, and DIRECTION is one of the
+symbols `left', `right', `above' or `below'.  SPLIT can be nil,
+in which case the value of `ebdb-default-window-size' will be
+used.  DIRECTION can also be nil, in which case the direction
+will either be `right' or `below', depending on the height and
+width of the window to be split.
 
-Alternately, the return value can be nil, which means continue
-using the current window.")
+Alternately, the entire return value can be nil, which means
+continue using the current window.")
 
 (cl-defmethod ebdb-popup-window (&context (major-mode ebdb-mode))
   "When popping up from an existing *EBDB* buffer, just reuse the window.
-
 Ie, don't pop up at all."
   nil)
 
 (cl-defmethod ebdb-popup-window ()
-  "When popping up from a random window, use half the window."
-  (list (get-buffer-window) 0.5))
+  "Return a default pop-up spec for an unspecified mode.
+If there's no specialization for the current mode, default to
+splitting the current window, using `ebdb-default-window-size'."
+  (list (get-buffer-window) ebdb-default-window-size))
 
 (defun ebdb-display-records (records &optional fmt append
                                      select pop buf)
@@ -1170,11 +1176,14 @@ popped up from."
 		      nil)
 		     ((integerp (cadr pop))
 		      (cadr pop))
-		     (t
-		      (let ((ratio (- 1 (or (cadr pop) 0.5)))
-			    (dimension (max (window-total-width split-window)
-					    (window-total-height split-window))))
-			(round (* dimension ratio)))))))
+		     ((or (floatp (cadr pop)) (floatp ebdb-default-window-size))
+		      (let ((flt (or (cadr pop) ebdb-default-window-size)))
+			(round (* (if (memq direction '(left right))
+				      (window-total-width split-window)
+				    (window-total-height split-window))
+				  (- 1 flt)))))
+		     ((integerp ebdb-default-window-size)
+		      ebdb-default-window-size))))
 
     (cond (buffer-window
 	   ;; It's already visible, re-use it.
@@ -1453,9 +1462,8 @@ Use the symbol `mark', or the mark provided by MARK."
   (interactive (list (read-string "New buffer name: ")))
   (when (eql major-mode 'ebdb-mode)
     (rename-buffer
-     (generate-new-buffer-name
-      (format "*%s-%s*" ebdb-buffer-name new-name)))
-    (force-mode-line-update)))
+     (format "*%s-%s*" ebdb-buffer-name new-name) t)
+    (force-mode-line-update t)))
 
 ;; Unloading/Reloading/Disabling
 
@@ -1709,6 +1717,37 @@ for these values."
 	(record-class
 	 (eieio-read-subclass "Use which record class? " 'ebdb-record nil t)))
     (ebdb-create-record db record-class)))
+
+;;;###autoload
+(defun ebdb-create-record-and-role (rec)
+  "Convenience function for creating a record and role at once.
+If called on an organization record, create a new person record
+and give them a role at the organization.  If called on a person,
+do the reverse."
+  (interactive
+   (list (ebdb-current-record)))
+  (let ((make-org (if (object-of-class-p rec 'ebdb-record-person)
+		      t nil))
+	(db (car (slot-value (ebdb-record-cache rec) 'database)))
+	new-rec role-field)
+    (ebdb-create-record
+     db
+     (if make-org
+	 'ebdb-record-organization
+       'ebdb-record-person))
+    (setq new-rec (ebdb-current-record))
+    (setq role-field (ebdb-read 'ebdb-field-role
+				`(:record-uuid
+				  ,(ebdb-record-uuid
+				    (if make-org rec
+				      new-rec))
+				  :org-uuid
+				  ,(ebdb-record-uuid
+				    (if make-org new-rec
+				      rec)))))
+    (ebdb-with-record-edits (if make-org rec new-rec)
+      (ebdb-com-insert-field (if make-org rec new-rec)
+			     role-field))))
 
 ;;;###autoload
 (defun ebdb-insert-field (records)
@@ -3008,7 +3047,10 @@ message."
 ;;; Formatting
 
 ;;;###autoload
-(defun ebdb-format-to-tmp-buffer (&optional formatter records)
+(defun ebdb-format-to-tmp-buffer (formatter records)
+  "Format some records and display in a temporary buffer.
+Records are formatted using FORMATTER, which is prompted for.
+RECORDS is the record under point, or all marked records."
   (interactive
    (list (ebdb-prompt-for-formatter)
 	 (ebdb-do-records)))
@@ -3042,6 +3084,16 @@ message."
     (let ((f (slot-value formatter 'post-format-function)))
       (when (fboundp f)
 	(funcall f)))))
+
+;;;###autoload
+(defun ebdb-format-these-records (formatter)
+  "Format all records in the current *EBDB* buffer.
+Prompts for FORMATTER to use."
+  (interactive
+   (list (ebdb-prompt-for-formatter)))
+  (if (derived-mode-p 'ebdb-mode)
+      (ebdb-format-to-tmp-buffer formatter (mapcar #'car ebdb-records))
+    (error "Not in an *EBDB* buffer")))
 
 ;;; Copy to kill ring
 

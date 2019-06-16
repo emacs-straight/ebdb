@@ -388,8 +388,14 @@ to come up with a good interface for viewing and manipulating these
 extra fields, however, so the functionality remains hidden.
 Suggestions are very welcome.
 
-Manipulating role fields is generally a little clunky, at present.
-This will be addressed in future.
+#+FINDEX: ebdb-create-record-and-role
+It can often feel a little clunky creating a new organization to
+associate with a person, or vice versa.  EBDB provides a convenience
+function to create a new person or organization record, and associate
+it with the existing record under point, in one step, using the
+{{{kbd(F)}}}.  This will create a new organization if point is on a
+person record, or a new person if point is on an organization.
+
 *** Tag field
 :PROPERTIES:
 :ID:       d9073bc7-8731-4919-9fc0-7d1dcf98426e
@@ -449,6 +455,7 @@ the records referenced in that message. It can:
 Each of these functionalities is optional, and can be customized
 independently of the others.
 *** Pop-up Buffers
+#+CINDEX: Pop-up buffers
 Each MUA creates its own EBDB pop-up buffer, with a name like
 {{{buf(EBDB-Gnus)}}} or {{{buf(EBDB-Rmail)}}}.  MUAs will re-use their
 own buffers, and will not interfere with buffers the user has created
@@ -476,14 +483,24 @@ Windows,,,elisp}@@).
 #+ATTR_TEXINFO: :options ebdb-join-atomic-windows
 #+begin_defopt
 When non-nil (the default), EBDB buffers that are popped up within
-existing atomic windows will become part of the atomic buffer.
+existing atomic windows will become part of the atomic window.
 Otherwise they will be opened to one side of the atomic window.
 #+end_defopt
 
-At present, there are _no_ other user customization options
-controlling the size and layout of MUA pop-up buffers: each MUA
-creates the pop-up according to hard-coded rules.  This will likely
-change in the future: please complain to the author.
+#+ATTR_TEXINFO: :options ebdb-default-window-size
+#+begin_defopt
+Set to a float between 0 and 1 to specify how much of an existing
+window the popped-up {{{buf(EBDB)}}} buffer should occupy.
+#+end_defopt
+
+In addition, each MUA has its own customization option for controlling
+the window size of pop-up buffers.  Each option is named as
+~ebdb-<MUA>-window-size~, and each defaults to
+~ebdb-default-window-size~.
+
+Beyond this, there are no other user customization options controlling
+the layout of MUA pop-up buffers.  Further customization will likely
+be added in the future: please complain to the author.
 *** Auto-Updating Records
 EBDB can automatically update the name and mail addresses of records
 based on information in an MUA message. The first and most important
@@ -1315,9 +1332,9 @@ imperfect: not all fields can be exported correctly.  VCard version
 - F ::
 
      #+KINDEX: F
-     #+FINDEX: ebdb-format-all-records
-     Export all records in the database (not only those displayed) to
-     a different format (~ebdb-format-all-records~).
+     #+FINDEX: ebdb-format-these-records
+     Export all records in the current EBDB buffer to a different
+     format (~ebdb-format-these-records~).
 
 It's possible to write new formatters, documentation is forthcoming.
 * Completion

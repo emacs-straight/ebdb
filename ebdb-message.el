@@ -25,6 +25,7 @@
 
 
 (require 'ebdb-mua)
+(require 'ebdb-com)
 (require 'message)
 (require 'sendmail)
 
@@ -35,21 +36,27 @@
   :group 'ebdb-mua)
 (put 'ebdb-mua-message 'custom-loads '(ebdb-message))
 
+(defcustom ebdb-message-window-size ebdb-default-window-size
+  "Size of the EBDB buffer when popping up in message-mode.
+Size should be specified as a float between 0 and 1.  Defaults to
+the value of `ebdb-default-window-size'."
+  :type 'float)
+
 (defcustom ebdb-message-reply-window-config
-  '(reply
+  `(reply
     (horizontal 1.0
 		(message 1.0 point)
-		(ebdb-message 0.4)))
+		(ebdb-message ,ebdb-message-window-size)))
   "Message reply window configuration to show EBDB.
 See Gnus' manual for details."
   :group 'ebdb-mua-message
   :type 'list)
 
 (defcustom ebdb-message-reply-yank-window-config
-  '(reply-yank
+  `(reply-yank
      (horizontal 1.0
 		 (message 1.0 point)
-		 (ebdb-message 0.4)))
+		 (ebdb-message ,ebdb-message-window-size)))
   "Message reply-yank window configuration to show EBDB.
 See Gnus' manual for details."
   :group 'ebdb-mua-message
@@ -85,14 +92,21 @@ See Gnus' manual for details."
   (message-field-value header))
 
 (cl-defmethod ebdb-popup-window (&context (major-mode message-mode))
-  (list (get-buffer-window) 0.4))
+  (list (get-buffer-window) ebdb-message-window-size))
 
 (cl-defmethod ebdb-popup-window (&context (major-mode mail-mode))
-  (list (get-buffer-window) 0.4))
+  (list (get-buffer-window) ebdb-message-window-size))
 
 (defun ebdb-message-complete-mail-cleanup (str _buffer pos &rest _)
   "Call `ebdb-complete-mail-cleanup' after capf completion."
   (ebdb-complete-mail-cleanup str pos))
+
+(defun ebdb-message-quit-ebdb ()
+  "Remove the EBDB window if the user kills the message buffer.
+Also fires when postponing a draft."
+  (let ((win (get-buffer-window (ebdb-message-buffer-name))))
+    (when win
+      (quit-window nil win))))
 
 (defun ebdb-insinuate-message ()
   ;; We don't currently bind the `ebdb-mua-keymap'.
@@ -111,6 +125,8 @@ See Gnus' manual for details."
      (cl-pushnew '("^\\(Resent-\\)?\\(To\\|B?Cc\\|Reply-To\\|From\\|Mail-Followup-To\\|Mail-Copies-To\\):" . ebdb-complete-mail)
   		 message-completion-alist
   		 :test #'equal)))
+  (message-add-action
+   #'ebdb-message-quit-ebdb 'exit 'postpone 'kill)
   ;; Other MUAs clear the EBDB buffer before displaying (in
   ;; `ebdb-mua-auto-update', the call to `ebdb-display-records' does
   ;; not pass the "append" flag).  Displaying in message-mode does

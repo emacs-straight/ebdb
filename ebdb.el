@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2016-2018  Free Software Foundation, Inc.
 
-;; Version: 0.6.8
+;; Version: 0.6.9
 ;; Package-Requires: ((emacs "25.1") (cl-lib "0.5") (seq "2.15"))
 
 ;; Maintainer: Eric Abrahamsen <eric@ericabrahamsen.net>
@@ -1436,11 +1436,11 @@ first one."
   (cl-call-next-method))
 
 (cl-defmethod ebdb-read ((role (subclass ebdb-field-role)) &optional slots obj)
-  (let ((org-id (or (plist-get slots 'org-uuid)
+  (let ((org-id (or (plist-get slots :org-uuid)
 		    (if obj (slot-value obj 'org-uuid)
 		      (ebdb-record-uuid (ebdb-prompt-for-record
 					 nil 'ebdb-record-organization)))))
-	(mail (or (plist-get slots 'mail)
+	(mail (or (plist-get slots :mail)
 		  (ebdb-with-exit
 		   (ebdb-read ebdb-default-mail-class nil
 			      (when obj (slot-value obj 'mail)))))))
@@ -1943,13 +1943,18 @@ Eventually this method will go away."
 (cl-defmethod ebdb-read ((class (subclass ebdb-field-anniversary)) &optional slots obj)
   ;; Fake `calendar-read-date' to make the year optional.
   (let* ((year (ebdb-with-exit
-		(read-number "Year (C-g to omit): ")))
+		(read-number "Year (C-g to omit): "
+			     (when obj (nth 2 (slot-value obj 'date))))))
 	 (month (cdr (assoc-string
 		      (completing-read
 		       "Month: "
 		       (mapcar 'list (append
 				      calendar-month-name-array nil))
-		       nil t)
+		       nil t (when obj
+			       (aref
+				calendar-month-name-array
+				(1- (nth 0 (slot-value obj 'date)))))
+		       nil)
 		      (calendar-make-alist
 		       calendar-month-name-array 1)
 		      t)))
@@ -1958,7 +1963,9 @@ Eventually this method will go away."
 		month (or year 2017)))
 	 (day (calendar-read (format "Day (1-%d): " last)
 			     (lambda (x) (and (< 0 x)
-					      (<= x last))))))
+					      (<= x last)))
+			     (when obj (number-to-string
+					(nth 1 (slot-value obj 'date)))))))
     (cl-call-next-method class
 			 (plist-put slots :date
 				    (list month day year))
@@ -2917,30 +2924,35 @@ or actual image data."
 					       (field ebdb-field-anniversary))
   "Go to the date of anniversary FIELD in the calendar.
 If FIELD doesn't specify a year, use the current year."
-  ;; This and the next function should be rethought.  Do people really
-  ;; want to look at the original date?  Won't they usually want to
-  ;; see the most recent, or the upcoming, occurrence of the date?
-  (let ((date (slot-value field 'date)))
-   (calendar)
-   (calendar-goto-date
-    (if (nth 2 date)
-	date
-      (pcase-let ((`(,month ,day) date)
-		  (cur-year (nth 5 (decode-time (current-time)))))
-	(list month day cur-year))))))
+  (let* ((date (slot-value field 'date))
+	 (this-year (nth 5 (decode-time (current-time))))
+	 (year (+ this-year
+		  ;; If this year's occurrence is already in the past,
+		  ;; use next year's.
+		  (if (time-less-p
+		       (encode-time
+			1 1 1 (nth 1 date) (nth 0 date) this-year)
+		       nil)
+		      1 0))))
+    (calendar)
+    (calendar-goto-date
+     (append (seq-subseq date 0 2) (list year)))))
 
 (cl-defmethod ebdb-field-anniversary-agenda ((_record ebdb-record)
 					     (field ebdb-field-anniversary))
   "Go to the date of anniversary FIELD in the Org agenda.
 If FIELD doesn't specify a year, use the current year."
-  (let ((date (slot-value field 'date)))
+  (let* ((date (slot-value field 'date))
+	 (this-year (nth 5 (decode-time (current-time))))
+	 (year (+ this-year
+		  (if (time-less-p
+		       (encode-time
+			1 1 1 (nth 1 date) (nth 0 date) this-year)
+		       nil)
+		      1 0))))
     (org-agenda-list
      nil
-     (calendar-absolute-from-gregorian
-      (if (nth 2 date)
-	  date
-	(append date (list (nth 5 (decode-time
-				   (current-time))))))))))
+     (format "%d-%d-%d" year (nth 0 date) (nth 1 date)))))
 
 (cl-defmethod ebdb-field-anniv-diary-entry ((field ebdb-field-anniversary)
 					    (record ebdb-record))
@@ -3341,7 +3353,7 @@ ARGS are passed to `ebdb-compose-mail', and then to
 
 (cl-defmethod ebdb-read ((class (subclass ebdb-record-organization)) &optional slots)
   (let ((name (ebdb-read 'ebdb-field-name-simple slots
-			 (plist-get slots 'name)))
+			 (plist-get slots :name)))
 	(domain (ebdb-with-exit (ebdb-read 'ebdb-field-domain))))
     (setq slots (plist-put slots :name name))
     (when domain

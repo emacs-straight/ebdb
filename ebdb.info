@@ -547,8 +547,12 @@ come up with a good interface for viewing and manipulating these extra
 fields, however, so the functionality remains hidden.  Suggestions are
 very welcome.
 
-   Manipulating role fields is generally a little clunky, at present.
-This will be addressed in future.
+   It can often feel a little clunky creating a new organization to
+associate with a person, or vice versa.  EBDB provides a convenience
+function to create a new person or organization record, and associate it
+with the existing record under point, in one step, using the ‘F’.  This
+will create a new organization if point is on a person record, or a new
+person if point is on an organization.
 
 
 File: ebdb.info,  Node: Tag field,  Next: Mail folder field,  Prev: Role fields,  Up: Field Types
@@ -668,13 +672,21 @@ Windows::).
 
  -- User Option: ebdb-join-atomic-windows
      When non-nil (the default), EBDB buffers that are popped up within
-     existing atomic windows will become part of the atomic buffer.
+     existing atomic windows will become part of the atomic window.
      Otherwise they will be opened to one side of the atomic window.
 
-   At present, there are _no_ other user customization options
-controlling the size and layout of MUA pop-up buffers: each MUA creates
-the pop-up according to hard-coded rules.  This will likely change in
-the future: please complain to the author.
+ -- User Option: ebdb-default-window-size
+     Set to a float between 0 and 1 to specify how much of an existing
+     window the popped-up *EBDB* buffer should occupy.
+
+   In addition, each MUA has its own customization option for
+controlling the window size of pop-up buffers.  Each option is named as
+‘ebdb-<MUA>-window-size’, and each defaults to
+‘ebdb-default-window-size’.
+
+   Beyond this, there are no other user customization options
+controlling the layout of MUA pop-up buffers.  Further customization
+will likely be added in the future: please complain to the author.
 
 
 File: ebdb.info,  Node: Auto-Updating Records,  Next: Noticing and Automatic Rules,  Prev: Pop-up Buffers,  Up: Display and Updating
@@ -1409,8 +1421,8 @@ is unsupported: the only options are version 3.0 and 4.0.
      *note marking: Marking. to format multiple records.
 
 ‘F’
-     Export all records in the database (not only those displayed) to a
-     different format (‘ebdb-format-all-records’).
+     Export all records in the current EBDB buffer to a different format
+     (‘ebdb-format-these-records’).
 
    It’s possible to write new formatters, documentation is forthcoming.
 
@@ -2300,6 +2312,7 @@ File: ebdb.info,  Node: Index,  Prev: Hacking EBDB,  Up: Top
 * ebdb-create-record:                    Creating Records.    (line   6)
 * ebdb-create-record <1>:                The Basics of ebdb-mode.
                                                               (line  22)
+* ebdb-create-record-and-role:           Role fields.         (line  33)
 * ebdb-create-record-extended:           Creating Records.    (line  14)
 * ebdb-create-record-extended <1>:       The Basics of ebdb-mode.
                                                               (line  26)
@@ -2326,6 +2339,7 @@ File: ebdb.info,  Node: Index,  Prev: Hacking EBDB,  Up: Top
 * ebdb-default-phone-class:              Hacking EBDB.        (line  40)
 * ebdb-default-record-class:             Creating Records.    (line  10)
 * ebdb-default-record-class <1>:         Hacking EBDB.        (line  24)
+* ebdb-default-window-size:              Pop-up Buffers.      (line  31)
 * ebdb-delete-field:                     Init and Delete Methods.
                                                               (line  15)
 * ebdb-delete-field-or-record:           The Basics of ebdb-mode.
@@ -2348,7 +2362,7 @@ File: ebdb.info,  Node: Index,  Prev: Hacking EBDB,  Up: Top
                                                               (line  24)
 * ebdb-fill-field-values:                Customizing Record Display.
                                                               (line  28)
-* ebdb-format-all-records:               Exporting/Formatting.
+* ebdb-format-these-records:             Exporting/Formatting.
                                                               (line  20)
 * ebdb-format-to-tmp-buffer:             Exporting/Formatting.
                                                               (line  15)
@@ -2524,6 +2538,7 @@ File: ebdb.info,  Node: Index,  Prev: Hacking EBDB,  Up: Top
                                                               (line  13)
 * P:                                     The Basics of ebdb-mode.
                                                               (line  19)
+* Pop-up buffers:                        Pop-up Buffers.      (line   6)
 * q:                                     The Basics of ebdb-mode.
                                                               (line 124)
 * quit-window:                           The Basics of ebdb-mode.
@@ -2573,51 +2588,51 @@ Node: Editing Existing Fields14210
 Node: Deleting Records and Fields14810
 Node: Field Types15206
 Node: Role fields17492
-Node: Tag field19180
-Node: Mail folder field19824
-Node: MUA Interaction20152
-Node: Loading MUA Code20705
-Node: Display and Updating21418
-Node: Pop-up Buffers22184
-Node: Auto-Updating Records23767
-Node: Noticing and Automatic Rules26167
-Node: Interactive Commands27500
-Node: EBDB and MUA summary buffers29975
-Node: Sender name display30493
-Node: Summary buffer marks31720
-Node: Mail Address Completion32899
-Node: A Note on Completion35408
-Node: Specific MUAs36031
-Node: Gnus36179
-Node: Posting Styles36401
-Node: EBDB Buffers37976
-Node: Searching39187
-Node: Changing Search Behavior40849
-Node: The Basics of ebdb-mode42096
-Node: Customizing Record Display46405
-Node: Marking50725
-Node: Exporting/Formatting51152
-Node: Completion52101
-Node: Snarfing52897
-Node: Internationalization54914
-Node: Diary Integration57615
-Node: Mail Aliases58480
-Node: vCard Support59194
-Node: Org Integration59693
-Node: Citing Records61591
-Node: Hacking EBDB62349
-Node: Field Classes64940
-Node: Init and Delete Methods68076
-Node: The Labeled Field Class69583
-Node: The Singleton Field Class70437
-Node: Actions70875
-Node: Custom Field Searching71547
-Node: Fast Lookups74414
-Node: Formatting in the EBDB Buffer76224
-Node: Writing Internationalization Libraries78300
-Node: Writing Integration For New MUAs82714
-Node: Article snarfing86162
-Node: Index86880
+Node: Tag field19473
+Node: Mail folder field20117
+Node: MUA Interaction20445
+Node: Loading MUA Code20998
+Node: Display and Updating21711
+Node: Pop-up Buffers22477
+Node: Auto-Updating Records24397
+Node: Noticing and Automatic Rules26797
+Node: Interactive Commands28130
+Node: EBDB and MUA summary buffers30605
+Node: Sender name display31123
+Node: Summary buffer marks32350
+Node: Mail Address Completion33529
+Node: A Note on Completion36038
+Node: Specific MUAs36661
+Node: Gnus36809
+Node: Posting Styles37031
+Node: EBDB Buffers38606
+Node: Searching39817
+Node: Changing Search Behavior41479
+Node: The Basics of ebdb-mode42726
+Node: Customizing Record Display47035
+Node: Marking51355
+Node: Exporting/Formatting51782
+Node: Completion52717
+Node: Snarfing53513
+Node: Internationalization55530
+Node: Diary Integration58231
+Node: Mail Aliases59096
+Node: vCard Support59810
+Node: Org Integration60309
+Node: Citing Records62207
+Node: Hacking EBDB62965
+Node: Field Classes65556
+Node: Init and Delete Methods68692
+Node: The Labeled Field Class70199
+Node: The Singleton Field Class71053
+Node: Actions71491
+Node: Custom Field Searching72163
+Node: Fast Lookups75030
+Node: Formatting in the EBDB Buffer76840
+Node: Writing Internationalization Libraries78916
+Node: Writing Integration For New MUAs83330
+Node: Article snarfing86778
+Node: Index87496
 
 End Tag Table
 

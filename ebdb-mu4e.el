@@ -25,11 +25,22 @@
 ;;; Code:
 
 (require 'ebdb-mua)
+(require 'ebdb-message)
 (if t (require 'mu4e-view))
 
 (defvar mu4e~view-buffer-name)
 (defvar mu4e-view-mode-map)
 (declare-function message-field-value "message")
+
+(defgroup ebdb-mua-mu4e nil
+  "Mu4e-specific EBDB customizations."
+  :group 'ebdb-mua)
+
+(defcustom ebdb-mu4e-window-size ebdb-default-window-size
+  "Size of the EBDB buffer when popping up in mu4e.
+Size should be specified as a float between 0 and 1.  Defaults to
+the value of `ebdb-default-window-size'."
+  :type 'float)
 
 ;; Tackle `mu4e-headers-mode' later
 
@@ -42,10 +53,19 @@
   "Produce a EBDB buffer name associated with mu4e mode."
   (format "*%s-mu4e*" ebdb-buffer-name))
 
+(cl-defmethod ebdb-popup-window (&context (major-mode mu4e-view-mode))
+  (list (get-buffer-window) ebdb-mu4e-window-size))
+
 (defun ebdb-insinuate-mu4e ()
   "Hook EBDB into mu4e."
   ;; Tackle headers later
-  (define-key mu4e-view-mode-map ";" ebdb-mua-keymap))
+  (define-key mu4e-view-mode-map ";" ebdb-mua-keymap)
+  (add-hook 'message-sent-hook
+	    (lambda ()
+	      (let ((win (get-buffer-window (ebdb-message-buffer-name))))
+		(when (and win
+			   (window-live-p win))
+		  (quit-window nil win))))))
 
 ;; Why wasn't `ebdb-mua-auto-update' ever hooked in to mu4e?
 
