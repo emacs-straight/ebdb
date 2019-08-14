@@ -359,6 +359,14 @@ anniversary date, and the sexp (as a string):
   :group 'ebdb
   :type 'hook)
 
+(defcustom ebdb-before-save-hook nil
+  "Hook run before saving all databases."
+  :type 'hook)
+
+(defcustom ebdb-after-save-hook nil
+  "Hook run after saving all databases."
+  :type 'hook)
+
 (defvar ebdb-create-hook nil
   "*Hook run each time a new EBDB record is created.
 Run with one argument, the new record.  This is called before the record is
@@ -870,9 +878,11 @@ Then call `cl-call-next-method' with the new values.")
   (save-match-data
     (cl-call-next-method)))
 
-(cl-defmethod ebdb-parse ((field-class (subclass ebdb-field)) _str &optional slots)
+(cl-defmethod ebdb-parse ((field-class (subclass ebdb-field)) str &optional slots)
   "Create the actual field instance."
-  (apply 'make-instance field-class slots))
+  (condition-case nil
+      (apply 'make-instance field-class slots)
+    (error (signal 'ebdb-unparseable (list str)))))
 
 (cl-defmethod ebdb-parse :before ((_field-class (subclass ebdb-field)) str &optional _slots)
   (when (string-empty-p str)
@@ -1828,17 +1838,19 @@ The result looks like this:
       ;; "number" is saved as a string, partially for ease in
       ;; formatting, partially because if it's too long Emacs turns it
       ;; into a float, which is a pain in the ass.
-      (while (and (< (point) (point-max))
-		  (null (looking-at-p ext-regexp))
-		  (looking-at "[ \t]?\\([0-9]+\\)[- .]?"))
-	(setq acc (concat acc (match-string-no-properties 1)))
-	(goto-char (match-end 0)))
-      (when (looking-at ext-regexp)
+      (unless (plist-member slots :number)
+	(while (and (< (point) (point-max))
+		    (null (looking-at-p ext-regexp))
+		    (looking-at "[ \t]?\\([0-9]+\\)[- .]?"))
+	  (setq acc (concat acc (match-string-no-properties 1)))
+	  (goto-char (match-end 0)))
 	(setq slots
-	      (plist-put slots :extension (string-to-number
-					   (match-string 1))))))
-    (setq slots
-	  (plist-put slots :number acc))
+	      (plist-put slots :number acc)))
+      (unless (plist-member slots :number)
+	(when (looking-at ext-regexp)
+	  (setq slots
+		(plist-put slots :extension (string-to-number
+					     (match-string 1)))))))
     (cl-call-next-method class string slots)))
 
 (cl-defmethod cl-print-object ((phone ebdb-field-phone) stream)
@@ -3066,28 +3078,6 @@ If FIELD doesn't specify a year, use the current year."
 
 (cl-defmethod ebdb-record-organizations ((_record ebdb-record-entity))
   nil)
-
-(cl-defmethod ebdb-record-insert-field :before ((record ebdb-record-entity)
-						(mail ebdb-field-mail)
-						&optional _slot)
-  "Possibly set the priority of a newly-added mail address.
-If RECORD has no other primary mail, set MAIL's priority to
-primary."
-  (when (null (ebdb-record-one-mail record nil 'primary-only))
-    (setf (slot-value mail 'priority) 'primary)))
-
-(cl-defmethod ebdb-record-delete-field :after ((record ebdb-record-entity)
-					       (mail ebdb-field-mail)
-					       &optional _slot)
-  "Possibly alter the priority of RECORD's remaining mails.
-If there aren't any other primary mails, make the first of the
-remaining mails primary."
-  (let* ((mails (remove mail (ebdb-record-mail record t)))
-	 (clone (unless (object-assoc 'primary 'priority mails)
-		  (when (car mails)
-		    (clone (car mails) :priority 'primary)))))
-    (when clone
-      (ebdb-record-change-field record (car mails) clone))))
 
 (cl-defgeneric ebdb-compose-mail (records &rest args)
   "Prepare to compose a mail message to RECORDS.
@@ -5197,9 +5187,11 @@ additionally prompt to save each database individually."
   ;; TODO: Reimplement ebdb-remote-file, or otherwise do something
   ;; about that.
   (when interactive
-   (message "Saving the EBDB..."))
+    (message "Saving the EBDB..."))
+  (run-hooks 'ebdb-before-save-hook)
   (dolist (s ebdb-db-list)
     (ebdb-db-save s (eq interactive 4)))
+  (run-hooks 'ebdb-after-save-hook)
   (when interactive
    (message "Saving the EBDB... done")))
 

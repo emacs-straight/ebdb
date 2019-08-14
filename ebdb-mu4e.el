@@ -36,6 +36,15 @@
   "Mu4e-specific EBDB customizations."
   :group 'ebdb-mua)
 
+(defcustom ebdb-mu4e-auto-update-p ebdb-mua-reader-update-p
+  "Mu4e-specific value of `ebdb-mua-auto-update-p'."
+  :type '(choice (const :tag "do nothing" nil)
+                 (const :tag "search for existing records" existing)
+                 (const :tag "update existing records" update)
+                 (const :tag "query for update or record creation" query)
+                 (const :tag "update or create automatically" create)
+                 (function :tag "User-defined function")))
+
 (defcustom ebdb-mu4e-window-size ebdb-default-window-size
   "Size of the EBDB buffer when popping up in mu4e.
 Size should be specified as a float between 0 and 1.  Defaults to

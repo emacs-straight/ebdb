@@ -35,6 +35,15 @@
   :group 'ebdb-mua)
 (put 'ebdb-mua-gnus 'custom-loads '(ebdb-gnus))
 
+(defcustom ebdb-gnus-auto-update-p ebdb-mua-reader-update-p
+  "Gnus-specific value of `ebdb-mua-auto-update-p'."
+  :type '(choice (const :tag "do nothing" nil)
+                 (const :tag "search for existing records" existing)
+                 (const :tag "update existing records" update)
+                 (const :tag "query for update or record creation" query)
+                 (const :tag "update or create automatically" create)
+                 (function :tag "User-defined function")))
+
 (defcustom ebdb-gnus-window-size ebdb-default-window-size
   "Size of the EBDB buffer when popping up in Gnus.
 Size should be specified as a float between 0 and 1.  Defaults to
@@ -229,7 +238,10 @@ Note that `\( is the backquote, NOT the quote '\(."
 ;; Insinuation
 ;;
 
-(add-hook 'gnus-article-prepare-hook #'ebdb-mua-auto-update)
+(defun ebdb-gnus-auto-update ()
+  (ebdb-mua-auto-update ebdb-gnus-auto-update-p))
+
+(add-hook 'gnus-article-prepare-hook #'ebdb-gnus-auto-update)
 
 (add-hook 'gnus-startup-hook #'ebdb-insinuate-gnus)
 
