@@ -1,8 +1,8 @@
 ;;; ebdb.el --- Contact management package           -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2016-2019  Free Software Foundation, Inc.
+;; Copyright (C) 2016-2020  Free Software Foundation, Inc.
 
-;; Version: 0.6.11
+;; Version: 0.6.12
 ;; Package-Requires: ((emacs "25.1") (cl-lib "0.5") (seq "2.15"))
 
 ;; Maintainer: Eric Abrahamsen <eric@ericabrahamsen.net>
@@ -2349,6 +2349,15 @@ See `ebdb-url-valid-schemes' for a list of acceptable schemes."
 (cl-defmethod ebdb-string ((field ebdb-field-tags))
   (ebdb-concat 'ebdb-field-tags (slot-value field 'tags)))
 
+(cl-defmethod ebdb-read ((field (subclass ebdb-field-tags)) &optional slots obj)
+  (let* ((crm-separator (cadr (assq 'ebdb-field-tags ebdb-separator-alist)))
+	 (val (completing-read-multiple
+	       (format "Tags (separate with \"%s\"): " crm-separator)
+	       ebdb-tags
+	       nil nil
+	       (when obj (ebdb-string obj)))))
+    (cl-call-next-method field (plist-put slots :tags val))))
+
 (cl-defmethod ebdb-search-read ((_class (subclass ebdb-field-tags)))
   (let ((search-string (ebdb-read-string
 			"Search for tags (eg +tag1-tag2|tag3): ")))
@@ -2889,12 +2898,16 @@ by the field, or else raising the error `ebdb-related-unfound'.")
 					&optional _slot)
   "Prevent RECORD from having more than one instance of FIELD."
   (let ((existing (ebdb-record-field record (eieio-object-class field))))
+    ;; Using a class name with `ebdb-record-field' always returns a
+    ;; list.
     (when existing
-      (ebdb-record-delete-field record existing))
+      (dolist (f existing)
+       (ebdb-record-delete-field record f)))
     (condition-case nil
 	(cl-call-next-method)
-      ;; Put the old one back if something goes wrong.
-      (error (ebdb-record-insert-field record existing)))))
+      ;; Put the old one back if something goes wrong.  There should
+      ;; only be one field instance, so we blindly use `car'.
+      (error (ebdb-record-insert-field record (car existing))))))
 
 (cl-defmethod ebdb-field-image-get ((field ebdb-field-image) (record ebdb-record))
   "Return the image for image field FIELD.
