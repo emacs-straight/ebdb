@@ -2350,13 +2350,17 @@ See `ebdb-url-valid-schemes' for a list of acceptable schemes."
   (ebdb-concat 'ebdb-field-tags (slot-value field 'tags)))
 
 (cl-defmethod ebdb-read ((field (subclass ebdb-field-tags)) &optional slots obj)
-  (let* ((crm-separator (cadr (assq 'ebdb-field-tags ebdb-separator-alist)))
-	 (val (completing-read-multiple
-	       (format "Tags (separate with \"%s\"): " crm-separator)
-	       ebdb-tags
-	       nil nil
-	       (when obj (ebdb-string obj)))))
-    (cl-call-next-method field (plist-put slots :tags val))))
+  (let ((crm-separator (cadr (assq 'ebdb-field-tags ebdb-separator-alist))))
+    (cl-call-next-method
+     field
+     (if (plist-member slots :tags)
+	 slots
+       (plist-put slots :tags
+		  (completing-read-multiple
+		   (format "Tags (separate with \"%s\"): " crm-separator)
+		   ebdb-tags
+		   nil nil
+		   (when obj (ebdb-string obj))))))))
 
 (cl-defmethod ebdb-search-read ((_class (subclass ebdb-field-tags)))
   (let ((search-string (ebdb-read-string
@@ -5071,8 +5075,7 @@ All the important work is done by the `ebdb-db-load' method."
     (run-hooks 'ebdb-after-load-hook)
     (when ebdb-use-diary
       (add-hook 'diary-list-entries-hook #'ebdb-diary-add-entries))
-    (when ebdb-save-on-exit
-      (add-hook 'kill-emacs-hook #'ebdb-save))
+    (add-hook 'kill-emacs-hook #'ebdb-save-on-emacs-exit)
     (length ebdb-record-tracker)))
 
 ;; If we wanted to make it seem like EBDB was loading faster, we could
@@ -5198,7 +5201,7 @@ This is a generic function that dispatches on the value of
 
 
 
-;;; Loading and saving EBDB
+;;; Saving EBDB.
 
 (defun ebdb-save (&optional interactive)
   "Save the EBDB if it is modified.
@@ -5213,7 +5216,14 @@ additionally prompt to save each database individually."
     (ebdb-db-save s (eq interactive 4)))
   (run-hooks 'ebdb-after-save-hook)
   (when interactive
-   (message "Saving the EBDB... done")))
+    (message "Saving the EBDB... done")))
+
+(defun ebdb-save-on-emacs-exit ()
+  "Possibly save EBDB when exiting Emacs.
+See option `ebdb-save-on-exit'."
+  (when ebdb-save-on-exit
+    ;; `kill-emacs-hook' functions should not interact with the user.
+    (ebdb-save)))
 
 
 ;;; Searching EBDB
