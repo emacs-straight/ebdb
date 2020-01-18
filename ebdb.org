@@ -206,10 +206,13 @@ Other database-related commands:
 #+CINDEX: Saving the database
 #+VINDEX: ebdb-save-on-exit
 Typically, databases are saved using the {{{kbd(s)}}} binding in
-~ebdb-mode~ buffers, which runs ~ebdb-save~.  By default, EBDB also
-installs ~ebdb-save~ as part of the ~kill-emacs-hook~, so that the
-EBDB is automatically saved before Emacs exit.  Set
-~ebdb-save-on-exit~ to nil to prevent this.
+~ebdb-mode~ buffers, which runs ~ebdb-save~.  If you have open
+{{{buf(EBDB)}}} buffers and unsaved changes, you'll also be prompted
+to save the database when running ~save-some-buffers~.  If this isn't
+enough, you can also set ~ebdb-save-on-exit~ to non-nil to have EBDB
+saved automatically (and silently) when killing Emacs. Because killing
+Emacs already runs ~save-some-buffers~, this option is typically
+redundant and defaults to nil.
 
 #+CINDEX: Loading databases
 #+CINDEX: Database load times
@@ -468,10 +471,11 @@ below).
 #+ATTR_TEXINFO: :options ebdb-mua-default-formatter
 #+begin_defopt
 The default formatter to use for MUA pop-up buffers.  The value of
-this option should be an instance of ~ebdb-formatter-ebdb~; it
-defaults to ~ebdb-default-multiline-formatter~.  Other likely options
-would be the value of ~ebdb-default-oneline-formatter~, or a
-custom-made formatter, see [[id:20fc7a2a-55a9-43ef-9534-9e5887682a88][Customizing Record Display]].
+this option should be an instance of either the
+~ebdb-formatter-ebdb-multiline~ or the ~ebdb-formatter-ebdb-oneline~
+class; it defaults to ~ebdb-default-multiline-formatter~.  Other
+likely options would be the value of ~ebdb-default-oneline-formatter~,
+or a custom-made formatter, see [[id:20fc7a2a-55a9-43ef-9534-9e5887682a88][Customizing Record Display]].
 #+end_defopt
 
 EBDB can also integrate with atomic windows (@@texinfo:@xref{Atomic
@@ -1150,15 +1154,15 @@ keybindings apply.
 
      #+KINDEX: t
      #+FINDEX: ebdb-toggle-records-format
-     Toggle between a multi-line and one-line display (see [[id:20fc7a2a-55a9-43ef-9534-9e5887682a88][Customizing
+     Toggle between a multi-line, one-line, and full display (see [[id:20fc7a2a-55a9-43ef-9534-9e5887682a88][Customizing
      Record Display]]) (~ebdb-toggle-records-format~).
 
 - T ::
 
      #+KINDEX: T
-     #+FINDEX: ebdb-display-records-completely
-     Display all of a record's fields
-     (~ebdb-display-records-completely~).
+     #+FINDEX: ebdb-toggle-all-records-format
+     Toggle the display of all the records in the current
+     {{{buf(EBDB)}}} buffer.  (~ebdb-toggle-all-records-format~).
 
 - r ::
 

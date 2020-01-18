@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2016-2020  Free Software Foundation, Inc.
 
-;; Version: 0.6.12
+;; Version: 0.6.13
 ;; Package-Requires: ((emacs "25.1") (cl-lib "0.5") (seq "2.15"))
 
 ;; Maintainer: Eric Abrahamsen <eric@ericabrahamsen.net>
@@ -141,8 +141,12 @@ Future merging strategies may be smarter."
   :group 'ebdb-eieio
   :type 'boolean)
 
-(defcustom ebdb-save-on-exit t
-  "If non-nil, automatically save EBDB when exiting Emacs."
+(defcustom ebdb-save-on-exit nil
+  "If non-nil, automatically save EBDB when exiting Emacs.
+The user is always prompted to save the EBDB as part of the Emacs
+shutdown process anyway, reducing the usefulness of this option.
+If you're using EBDB without opening `ebdb-mode' buffers, you
+might consider setting it to t."
   :group 'ebdb-eieio
   :type 'boolean)
 

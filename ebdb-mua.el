@@ -476,9 +476,10 @@ are not \"noticed\", nor is the timestamp updated."
 
 (defcustom ebdb-mua-default-formatter ebdb-default-multiline-formatter
   "The default formatter to use for MUA pop-up buffers.
-The value should be an instance of the `ebdb-formatter-ebdb'
-class.  Easy choices are the value of
-`ebdb-default-multiline-formatter' or
+The value should be an instance of the
+`ebdb-formatter-ebdb-multiline' or the
+`ebdb-formatter-ebdb-oneline' classes.  Easy choices are the
+value of `ebdb-default-multiline-formatter' or
 `ebdb-default-oneline-formatter'."
   :group 'ebdb-mua
   :type 'ebdb-formatter-ebdb)
@@ -1270,13 +1271,16 @@ where it was in the MUA, rather than quitting the EBDB buffer."
 		[?q])))))))
 
 ;;;###autoload
-(defun ebdb-mua-toggle-records-format ()
-  "Toggle format of all records without leaving MUA."
-  (interactive)
+(defun ebdb-mua-toggle-records-format (&optional arg)
+  "Toggle format of all records without leaving MUA.
+See the docstring of `ebdb-toglge-records-format' for use of the
+prefix arg ARG."
+  (interactive "p")
   (let ((buf (get-buffer (ebdb-make-buffer-name))))
     (when buf
-     (with-current-buffer buf
-       (ebdb-toggle-records-format ebdb-records)))))
+      (with-current-buffer buf
+	(when ebdb-records
+	  (ebdb-toggle-records-format ebdb-records arg))))))
 
 ;;;###autoload
 (defun ebdb-mua-edit-sender-notes ()

@@ -367,10 +367,13 @@ a database, edit it using @code{ebdb-customize-database}, set
 @cindex Saving the database
 @vindex ebdb-save-on-exit
 Typically, databases are saved using the @kbd{s} binding in
-@code{ebdb-mode} buffers, which runs @code{ebdb-save}.  By default, EBDB also
-installs @code{ebdb-save} as part of the @code{kill-emacs-hook}, so that the
-EBDB is automatically saved before Emacs exit.  Set
-@code{ebdb-save-on-exit} to nil to prevent this.
+@code{ebdb-mode} buffers, which runs @code{ebdb-save}.  If you have open
+*EBDB* buffers and unsaved changes, you'll also be prompted
+to save the database when running @code{save-some-buffers}.  If this isn't
+enough, you can also set @code{ebdb-save-on-exit} to non-nil to have EBDB
+saved automatically (and silently) when killing Emacs. Because killing
+Emacs already runs @code{save-some-buffers}, this option is typically
+redundant and defaults to nil.
 
 @cindex Loading databases
 @cindex Database load times
@@ -686,10 +689,11 @@ below).
 
 @defopt ebdb-mua-default-formatter
 The default formatter to use for MUA pop-up buffers.  The value of
-this option should be an instance of @code{ebdb-formatter-ebdb}; it
-defaults to @code{ebdb-default-multiline-formatter}.  Other likely options
-would be the value of @code{ebdb-default-oneline-formatter}, or a
-custom-made formatter, see @ref{Customizing Record Display}.
+this option should be an instance of either the
+@code{ebdb-formatter-ebdb-multiline} or the @code{ebdb-formatter-ebdb-oneline}
+class; it defaults to @code{ebdb-default-multiline-formatter}.  Other
+likely options would be the value of @code{ebdb-default-oneline-formatter},
+or a custom-made formatter, see @ref{Customizing Record Display}.
 @end defopt
 
 EBDB can also integrate with atomic windows (@xref{Atomic
@@ -1385,14 +1389,14 @@ the ability to interpolate variables in the body text.
 @item t
 @kindex t
 @findex ebdb-toggle-records-format
-Toggle between a multi-line and one-line display (see @ref{Customizing Record Display, , Customizing
+Toggle between a multi-line, one-line, and full display (see @ref{Customizing Record Display, , Customizing
 Record Display}) (@code{ebdb-toggle-records-format}).
 
 @item T
 @kindex T
-@findex ebdb-display-records-completely
-Display all of a record's fields
-(@code{ebdb-display-records-completely}).
+@findex ebdb-toggle-all-records-format
+Toggle the display of all the records in the current
+*EBDB* buffer.  (@code{ebdb-toggle-all-records-format}).
 
 @item r
 @kindex r
@@ -1857,7 +1861,7 @@ classes: database, record, and field.  The behavior of EBDB can be
 radically changed by creating new classes, or overriding the existing
 methods of classes, without touching the original source code.  This
 manual won't go into details about Emacs' object-orientation support:
-see @ref{Top,EIEIO,,eieio,} for information on defining classes, and @ref{Generic Functions,Generic Functions,,elisp,}
+see @ref{Top,EIEIO,,eieio,} for information on defining classes, and @ref{Generic%20Functions,Generic Functions,,elisp,}
 for information on writing generic functions and methods.
 
 Some information about EBDB's various classes can had from Emacs'
@@ -2231,7 +2235,7 @@ used in the body of the method.
 @section Writing Internationalization Libraries
 
 Writing new internationalization libraries involves using generic
-functions. @ref{Generic Functions,Generic Functions,,elisp,}.  It will also require a bit of
+functions. @ref{Generic%20Functions,Generic Functions,,elisp,}.  It will also require a bit of
 familiarity with EBDB's internals.
 
 Internationalization affects three different field types: addresses,
