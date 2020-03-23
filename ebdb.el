@@ -4439,7 +4439,7 @@ RECORD.  If MAIL is nil use RECORD's primary mail address.  If
 MAIL is the symbol `prompt', prompt the user for a mail address
 to use."
   (unless (ebdb-field-mail-p mail)
-    (setq mail (ebdb-record-one-mail record (eq mail 'prompt) t t)))
+    (setq mail (ebdb-record-one-mail record (eq mail 'prompt) t)))
   (unless mail (error "Record has no mail addresses"))
   (let* ((name-base (or (slot-value mail 'aka) (ebdb-record-name record)))
 	 (mail (slot-value mail 'mail))
@@ -5678,6 +5678,13 @@ prompt users for more complex search criteria, if necessary.")
   "Read regexp to search across all records."
   (read-string (format "Search records %smatching regexp: "
                        (if ebdb-search-invert "not " ""))))
+
+(cl-defmethod ebdb-search-read :around (_source)
+  "Trim string search criteria."
+  (let ((criterion (cl-call-next-method)))
+    (if (stringp criterion)
+	(string-trim criterion)
+      criterion)))
 
 (provide 'ebdb)
 ;;; ebdb.el ends here
