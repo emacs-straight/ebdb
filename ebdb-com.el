@@ -550,6 +550,17 @@ choice: that formatter should be selected explicitly."
 				    (_record ebdb-record))
   (format "address (%s)" (ebdb-field-label field)))
 
+(cl-defmethod ebdb-fmt-field-label ((_fmt ebdb-formatter-ebdb)
+				    (field ebdb-field-relation)
+				    _style
+				    &optional (record ebdb-record))
+  ;; If FIELD doesn't belong to RECORD, we're showing a reverse
+  ;; relationship.
+  (let ((rel-id (slot-value field 'rel-uuid)))
+    (if (equal (ebdb-record-uuid record) rel-id)
+	(slot-value field 'rel-label)
+      (ebdb-field-label field))))
+
 (cl-defmethod ebdb-fmt-field :around ((_fmt ebdb-formatter-ebdb)
 				      (field ebdb-field)
 				      _style
@@ -599,6 +610,16 @@ Print the first line, add an ellipsis, and add a tooltip."
   (with-slots (bank-name account-name) field
     (format "%s: %s" bank-name account-name)))
 
+(cl-defmethod ebdb-fmt-field ((_fmt ebdb-formatter-ebdb)
+			      (field ebdb-field-relation)
+			      _style
+			      (record ebdb-record))
+  "Format relation-field FIELD for RECORD.
+If FIELD really belongs to RECORD, display the \"other end\" of
+the relation.  If this RECORD is the \"other end\", display the
+record that actually owns the field."
+  (let ((rec (ebdb-record-related record field)))
+    (ebdb-string rec)))
 
 (cl-defmethod ebdb-fmt-field ((_fmt ebdb-formatter-ebdb)
 			      (field ebdb-field-passport)
@@ -1023,53 +1044,54 @@ displayed records."
 		 records)))
     (dolist (b bufs)
       (with-current-buffer b
-	(let ((inhibit-read-only t)
-	      renumber)
-	  (dolist (r records)
-	    (catch 'bail
-	      ;; Find the location of record in this buffer.  The
-	      ;; majority of the time this function will be working on
-	      ;; the single record under point, so short-circuit that
-	      ;; case.  Check if record is present, or if its uuid has
-	      ;; been left behind by some previous redisplay.  If
-	      ;; record isn't in this buffer, then bail.
-	      (setq local-record (cond ((equal r (ignore-errors (ebdb-current-record)))
-					(ebdb-current-record t))
-				       ((assoc r ebdb-records))
-				       ((assoc (ebdb-record-uuid r) ebdb-records))
-				       (t (throw 'bail nil)))
-		    marker (nth 2 local-record)
-		    end-marker (nth 2 (car (cdr (memq local-record ebdb-records)))))
-	      (unless renumber-index
-		(setq renumber-index (cl-position local-record ebdb-records)))
-	      ;; If point is inside record, put it at the beginning of the record.
-	      (when (and (<= marker (point))
-			 (< (point) (or end-marker (point-max))))
-		(goto-char marker))
-	      (save-excursion
-		(goto-char marker)
-		(setq record-number (get-text-property (point) 'ebdb-record-number))
-		;; First insert the reformatted record, then delete the old one,
-		;; so that the marker of this record cannot collapse with the
-		;; marker of the subsequent record
-		(setq ret (ebdb-redisplay-record r action local-record))
-		(put-text-property marker (point) 'ebdb-record-number record-number)
-		(when (eq ret 'removed)
-		  (setq renumber t))
-		(when (memq ret '(removed replaced))
-		  (delete-region (point) (or end-marker (point-max)))))))
-	  (when renumber
-	    ;; If we deleted a record we need to update the subsequent
-	    ;; record numbers.
-	    (let* ((markers (append (mapcar (lambda (x) (nth 2 x))
-					    (cl-subseq ebdb-records renumber-index))
-				    (list (point-max))))
-		   (start (pop markers)))
-	      (dolist (end markers)
-		(put-text-property start end
-				   'ebdb-record-number record-number)
-		(setq start end
-		      record-number (1+ record-number))))))
+	(with-silent-modifications
+	  (let ((inhibit-read-only t)
+		renumber)
+	    (dolist (r records)
+	      (catch 'bail
+		;; Find the location of record in this buffer.  The
+		;; majority of the time this function will be working on
+		;; the single record under point, so short-circuit that
+		;; case.  Check if record is present, or if its uuid has
+		;; been left behind by some previous redisplay.  If
+		;; record isn't in this buffer, then bail.
+		(setq local-record (cond ((equal r (ignore-errors (ebdb-current-record)))
+					  (ebdb-current-record t))
+					 ((assoc r ebdb-records))
+					 ((assoc (ebdb-record-uuid r) ebdb-records))
+					 (t (throw 'bail nil)))
+		      marker (nth 2 local-record)
+		      end-marker (nth 2 (car (cdr (memq local-record ebdb-records)))))
+		(unless renumber-index
+		  (setq renumber-index (cl-position local-record ebdb-records)))
+		;; If point is inside record, put it at the beginning of the record.
+		(when (and (<= marker (point))
+			   (< (point) (or end-marker (point-max))))
+		  (goto-char marker))
+		(save-excursion
+		  (goto-char marker)
+		  (setq record-number (get-text-property (point) 'ebdb-record-number))
+		  ;; First insert the reformatted record, then delete the old one,
+		  ;; so that the marker of this record cannot collapse with the
+		  ;; marker of the subsequent record
+		  (setq ret (ebdb-redisplay-record r action local-record))
+		  (put-text-property marker (point) 'ebdb-record-number record-number)
+		  (when (eq ret 'removed)
+		    (setq renumber t))
+		  (when (memq ret '(removed replaced))
+		    (delete-region (point) (or end-marker (point-max)))))))
+	    (when renumber
+	      ;; If we deleted a record we need to update the subsequent
+	      ;; record numbers.
+	      (let* ((markers (append (mapcar (lambda (x) (nth 2 x))
+					      (cl-subseq ebdb-records renumber-index))
+				      (list (point-max))))
+		     (start (pop markers)))
+		(dolist (end markers)
+		  (put-text-property start end
+				     'ebdb-record-number record-number)
+		  (setq start end
+			record-number (1+ record-number)))))))
 	(run-hooks 'ebdb-display-hook)))))
 
 (easy-menu-define
@@ -1480,7 +1502,7 @@ Use the symbol `mark', or the mark provided by MARK."
 
 (defun ebdb-reload-database (db)
   "Reload all records from database DB."
-  (interactive (list (ebdb-prompt-for-db)))
+  (interactive (list (ebdb-prompt-for-db nil t)))
   (let ((db-str (ebdb-string db))
 	(rec-uuids (mapcar #'ebdb-record-uuid (slot-value db 'records))))
     ;; I don't actually know if keeping pointers to DB's records would
@@ -1878,6 +1900,15 @@ commands, called from an *EBDB* buffer, and the lower-level
 		 'uuid)))
     (ebdb-record-change-field person field)))
 
+(cl-defmethod ebdb-com-edit-field ((record ebdb-record-person)
+				   (field ebdb-field-relation))
+  (if (equal (slot-value field 'rel-uuid)
+	     (ebdb-record-uuid record))
+      (ebdb-record-change-field
+       (ebdb-record-related record field)
+       field)
+    (cl-call-next-method)))
+
 ;;;###autoload
 (defun ebdb-edit-field-customize (record field)
   "Use the customize interface to edit FIELD of RECORD."
@@ -2035,6 +2066,16 @@ confirm before deleting the field."
 				     noprompt)
   (let ((person (ebdb-gethash (slot-value field 'record-uuid) 'uuid)))
     (ebdb-com-delete-field person field noprompt)))
+
+(cl-defmethod ebdb-com-delete-field ((record ebdb-record-person)
+				     (field ebdb-field-relation)
+				     noprompt)
+  (if (equal (slot-value field 'rel-uuid)
+	     (ebdb-record-uuid record))
+      (ebdb-com-delete-field
+       (ebdb-record-related record field)
+       field noprompt)
+    (cl-call-next-method)))
 
 (cl-defmethod ebdb-com-delete-field :after ((record ebdb-record-entity)
 					    (mail ebdb-field-mail)
