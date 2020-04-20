@@ -518,7 +518,7 @@ choice: that formatter should be selected explicitly."
 
 (cl-defmethod ebdb-record-db-char-string ((record ebdb-record))
   "Return a char string indicating RECORDs databases."
-  (let* ((dbs (slot-value (ebdb-record-cache record) 'database))
+  (let* ((dbs (ebdb-record-databases record))
 	 (char-string
 	  (concat
 	   (delq nil
@@ -664,7 +664,7 @@ record that actually owns the field."
   (with-slots (mail defunct) field
     (let* ((rec-string
 	    (condition-case nil
-		(ebdb-record-name
+		(ebdb-record-name-string
 		 (ebdb-record-related record field))
 	      (ebdb-related-unfound "record not loaded")))
 	   (value (if mail
@@ -706,7 +706,7 @@ record that actually owns the field."
      (concat
       (ebdb-record-db-char-string record)
       " "
-      (propertize (ebdb-record-name record)
+      (propertize (ebdb-record-name-string record)
 		  'face (cdr (assoc record-class
 				    ebdb-name-face-alist))))
      ;; We don't actually ask the name field to format itself, just use
@@ -1354,7 +1354,8 @@ database."
         (popup-menu
          (append
           (list
-           (format "Commands for record \"%s\":" (ebdb-record-name record))
+           (format "Commands for record \"%s\":"
+		   (ebdb-record-name-string record))
            ["Delete Record" ebdb-delete-records t]
            ["Toggle Record Display Layout" ebdb-toggle-records-format t]
            ["Fully Display Record" ebdb-display-records-completely t]
@@ -1528,7 +1529,7 @@ reloaded with `ebdb-reload-database'."
 			      ;; Only disappear records that belong to
 			      ;; no other database.
 			      (= 1 (length
-				    (slot-value (ebdb-record-cache r) 'database))))
+				    (ebdb-record-databases r))))
 			    (slot-value db 'records))))
       (ebdb-redisplay-records recs 'remove)
       (ebdb-db-disable db)
@@ -1693,7 +1694,7 @@ runs `ebdb-after-change-hook', and redisplays the record."
   ;; within "body".  Hopefully that's not wrong.
   `(condition-case err
        (progn
-	 (dolist (d (slot-value (ebdb-record-cache ,record) 'database) nil)
+	 (dolist (d (ebdb-record-databases ,record) nil)
 	   (ebdb-db-editable d))
 	 (run-hook-with-args 'ebdb-change-hook ,record)
 	 ,@body
@@ -1764,7 +1765,7 @@ do the reverse."
    (list (ebdb-current-record)))
   (let ((make-org (if (object-of-class-p rec 'ebdb-record-person)
 		      t nil))
-	(db (car (slot-value (ebdb-record-cache rec) 'database)))
+	(db (car (ebdb-record-databases rec)))
 	new-rec role-field)
     (ebdb-create-record
      db
@@ -2399,13 +2400,13 @@ The search results are displayed in the EBDB buffer using formatter FMT."
     (dolist (record (ebdb-records))
 
       (when (and (memq 'name fields)
-                 (ebdb-record-name record)
-                 (setq hash (ebdb-gethash (ebdb-record-name record)
+                 (ebdb-record-name-string record)
+                 (setq hash (ebdb-gethash (ebdb-record-name-string record)
                                           '(fl-name lf-name aka)))
                  (> (length hash) 1))
         (setq ret (append hash ret))
         (message "EBDB record `%s' has duplicate name."
-                 (ebdb-record-name record))
+                 (ebdb-record-name-string record))
         (sit-for 0))
 
       (if (memq 'mail fields)
@@ -2414,7 +2415,7 @@ The search results are displayed in the EBDB buffer using formatter FMT."
             (when (> (length hash) 1)
               (setq ret (append hash ret))
               (message "EBDB record `%s' has duplicate mail `%s'."
-                       (ebdb-record-name record) mail)
+                       (ebdb-record-name-string record) mail)
               (sit-for 0))))
 
       (if (and (memq 'aka fields)
@@ -2425,7 +2426,7 @@ The search results are displayed in the EBDB buffer using formatter FMT."
             (when (> (length hash) 1)
               (setq ret (append hash ret))
               (message "EBDB record `%s' has duplicate aka `%s'"
-                       (ebdb-record-name record) aka)
+                       (ebdb-record-name-string record) aka)
               (sit-for 0)))))
 
     (ebdb-display-records (sort (delete-dups ret)
@@ -2768,14 +2769,15 @@ as part of the MUA insinuation."
             ;; Do we have a preferential order for the following tests?
             ;; (1) If ORIG matches name, AKA, or organization of ONE-RECORD,
             ;;     then ADDRESS will be the first mail address of ONE-RECORD.
-            (if (try-completion orig
-                                (append
-                                 (if (memq 'name completion-list)
-                                     (list (or (ebdb-record-name one-record) "")))
-                                 (if (memq 'alt-names completion-list)
-				     (or (ebdb-record-alt-names one-record) (list "")))
-                                 (if (memq 'organization completion-list)
-                                     (ebdb-record-organizations one-record))))
+            (if (try-completion
+		 orig
+                 (append
+                  (if (memq 'name completion-list)
+                      (list (or (ebdb-record-name-string one-record) "")))
+                  (if (memq 'alt-names completion-list)
+		      (or (ebdb-record-alt-names one-record) (list "")))
+                  (if (memq 'organization completion-list)
+                      (ebdb-record-organizations one-record))))
                 (setq mail (car mails)))
             ;; (2) If ORIG matches one or multiple mail addresses of ONE-RECORD,
             ;;     then we take the first one matching ORIG.
@@ -2823,7 +2825,8 @@ as part of the MUA insinuation."
                 (when mails
                   (dolist (field completion-list)
                     (cond ((eq field 'name)
-                           (if (ebdb-string= key (ebdb-record-name record))
+                           (if (ebdb-string= key
+					     (ebdb-record-name-string record))
                                (push (car mails) accept)))
                           ((eq field 'alt-names)
                            (if (member-ignore-case
