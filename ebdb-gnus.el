@@ -108,7 +108,7 @@ likely ways to extract information about the record."
 (cl-defmethod ebdb-read ((field (subclass ebdb-gnus-score-field)) &optional slots obj)
   (let ((score (string-to-number
 		(ebdb-read-string
-		 "Score: " (when obj (slot-value obj 'score))))))
+		 "Score" (when obj (slot-value obj 'score))))))
     (cl-call-next-method field (plist-put slots :score score) obj)))
 
 (cl-defmethod ebdb-string ((field ebdb-gnus-score-field))
@@ -356,6 +356,13 @@ composed to a certain record."
   ;; that restores the window configuration.
   (define-key gnus-summary-mode-map ";" ebdb-mua-keymap)
   (define-key gnus-article-mode-map ";" ebdb-mua-keymap)
+
+  ;; Versions of Gnus with the gnus-search.el library allow us to
+  ;; perform contact auto-completion within search queries.
+  (when (boundp 'gnus-search-contact-tables)
+    (add-hook 'ebdb-after-load-hook
+	      (lambda ()
+		(push ebdb-hashtable gnus-search-contact-tables))))
 
   ;; Set up user field for use in `gnus-summary-line-format'
   ;; (1) Big solution: use whole name
