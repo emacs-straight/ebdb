@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2016-2020  Free Software Foundation, Inc.
 
-;; Version: 0.6.20
+;; Version: 0.6.21
 ;; Package-Requires: ((emacs "25.1") (cl-lib "0.5") (seq "2.15"))
 
 ;; Maintainer: Eric Abrahamsen <eric@ericabrahamsen.net>
@@ -2701,10 +2701,10 @@ record uuids.")
 
 (cl-defmethod ebdb-string ((field ebdb-field-mail-alias))
   (with-slots (alias address) field
-    (format (if address
-		"%s: %s"
-	      "%s")
-	    alias (ebdb-string address))))
+    (if address (format
+		 "%s: %s"
+		 alias (ebdb-string address))
+      alias)))
 
 (cl-defmethod ebdb-init-field ((field ebdb-field-mail-alias) record)
   (with-slots (alias address) field
