@@ -3498,6 +3498,14 @@ FIELD."
   ;; FIXME: Also add nickname-plus-surname to the hashtable.
   (cl-call-next-method))
 
+(cl-defmethod ebdb-init-field ((name ebdb-field-name-simple)
+			       (record ebdb-record-person))
+  "Add a \"nickname-plus-lastname\" to the hash table."
+  (when-let ((last-name (ebdb-record-lastname record)))
+    (ebdb-puthash (concat (ebdb-string name) " " last-name)
+		  record))
+  (cl-call-next-method))
+
 (cl-defmethod ebdb-delete-field ((name ebdb-field-name-simple)
 				 (record ebdb-record-person)
 				 &optional _unload)
@@ -5293,7 +5301,7 @@ This results in the creation of all the secondary data
 structures: label lists, `ebdb-org-hashtable', record caches,
 etc.  If optional argument RECORDS is given, only initialize
 those records."
-  (mapcar #'ebdb-init-record (or records ebdb-record-tracker)))
+  (mapc #'ebdb-init-record (or records ebdb-record-tracker)))
 
 (defun ebdb-initialize-threadwise (&optional records)
   "Exactly the same as `ebdb-initialize', but yields thread.
@@ -5305,7 +5313,7 @@ interleave it with other thread-yielding operations to create an
 actual speedup.  If optional argument RECORDS is given, only
 initialize those records."
   (let ((c 0))
-    (mapcar
+    (mapc
      (lambda (r)
        (ebdb-init-record r)
        (when (= (mod (cl-incf c) 10) 0)
@@ -5796,6 +5804,13 @@ prompt users for more complex search criteria, if necessary.")
   (read-string (format "Search records with %s %smatching regexp: "
 		       (ebdb-field-readable-name cls)
 		       (if ebdb-search-invert "not " ""))))
+
+(cl-defmethod ebdb-search-read ((_cls (subclass ebdb-field-mail)))
+  (let ((ebdb-completion-list '(mail)))
+    (completing-read
+     (format "Search records with mail %smatching regexp: "
+	     (if ebdb-search-invert "not " ""))
+     ebdb-hashtable #'ebdb-completion-predicate)))
 
 (cl-defmethod ebdb-search-read ((field string))
   "Read regexp to search FIELD values of records."
