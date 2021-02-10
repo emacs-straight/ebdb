@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2016-2020  Free Software Foundation, Inc.
 
-;; Version: 0.6.21
+;; Version: 0.6.22
 ;; Package-Requires: ((emacs "25.1") (cl-lib "0.5") (seq "2.15"))
 
 ;; Maintainer: Eric Abrahamsen <eric@ericabrahamsen.net>
@@ -5274,7 +5274,8 @@ All the important work is done by the `ebdb-db-load' method."
     (setq ebdb-db-list (nreverse ebdb-db-list))
     (setq db-file-regexp
 	  (regexp-opt (mapcar (lambda (db)
-				(slot-value db 'file))
+				(expand-file-name
+				 (slot-value db 'file)))
 			      ebdb-db-list)))
     ;; If users look at the database files, they should be read as
     ;; utf-8-emacs.
