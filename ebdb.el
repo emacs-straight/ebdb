@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2016-2020  Free Software Foundation, Inc.
 
-;; Version: 0.6.24
+;; Version: 0.7
 ;; Package-Requires: ((emacs "25.1") (cl-lib "0.5") (seq "2.15"))
 
 ;; Maintainer: Eric Abrahamsen <eric@ericabrahamsen.net>
@@ -1248,8 +1248,8 @@ process."
     (setq label (ebdb-with-exit
 		    (ebdb-read-string
 		     (if (stringp human-readable)
-			 (format "%s label: " (capitalize human-readable))
-		       "Label: ")
+			 (format "%s label" (capitalize human-readable))
+		       "Label")
 		     label labels nil)))
     (when (and label
 	       (or
@@ -5833,6 +5833,13 @@ values, by default the search is not handed to the name field itself."
 	      (dolist (m mails)
 		(when (ebdb-field-search m regexp)
 		  (throw 'found t))))))))
+
+(cl-defmethod ebdb-record-search ((org ebdb-record-organization)
+				  (_type (subclass ebdb-field-domain))
+				  (criterion string))
+  (let ((dom (slot-value org 'domain)))
+    (and dom
+	 (string-match-p criterion (ebdb-string dom)))))
 
 (cl-defmethod ebdb-record-search ((record ebdb-record-person)
 				  (_type (eql organization))
