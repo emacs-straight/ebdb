@@ -121,7 +121,9 @@ number, and any remaining as an extension."
 (cl-defmethod ebdb-string-i18n ((phone ebdb-field-phone)
 				(_cc (eql 1)))
   (with-slots (area-code number extension) phone
-    (format "+1 (%d) %s-%s%s"
+    (format "%s(%d) %s-%s%s"
+	    (if (eql ebdb-default-phone-country 1)
+		"" "+1 ")
 	    area-code
 	    (substring number 0 3)
 	    (substring number 3)
@@ -171,7 +173,8 @@ number, and any remaining as an extension."
                                 (_cc (eql 33)))
   (with-slots (area-code number extension) phone
     (concat
-     "+33 "
+     (unless (eql ebdb-default-phone-country 33)
+      "+33 ")
      (when area-code
        (format "%02d" area-code))
      (apply #'format "%s%s %s%s %s%s %s%s"
@@ -179,13 +182,110 @@ number, and any remaining as an extension."
      (when extension
        (format "X%d" extension)))))
 
-;;; UK
+;;; Germany
+
+(cl-defmethod ebdb-string-i18n ((phone ebdb-field-phone)
+                                (_cc (eql 49)))
+  "Display a German phone number."
+  (let ((is-default (eql ebdb-default-phone-country 49))
+	num-len)
+    (with-slots (area-code number extension) phone
+      (setq num-len (length number))
+      (concat
+       (unless is-default
+	 "+49 ")
+       (when area-code
+	 (format (if is-default "(%03d) " "%d ") area-code))
+       (if (>= 4 num-len)
+	   number
+	 (mapconcat #'identity
+		    (seq-partition number
+				   (if (= 0 (mod num-len 3))
+				       3 4))
+	  " "))
+       (when extension
+	 (format "-%d" extension))))))
+
+(cl-defmethod ebdb-parse-i18n ((_class (subclass ebdb-field-phone))
+			       (str string)
+			       (_cc (eql 49))
+			       &optional slots)
+  "Parse a German phone number.
+Uses first block of digits as the area code, anything following a
+hyphen as the extension, and everything in between as the number
+itself."
+  (let ((area-code-regexp "^(?\\([[:digit:]]+\\))? +")
+	(extension-regexp "-\\([[:digit:]]+\\)\\'"))
+    (setq slots
+	  (plist-put slots :area-code
+		     (when (string-match area-code-regexp str)
+		       (prog1
+			   (string-to-number (match-string 1 str))
+			 (setq str (replace-regexp-in-string
+				    area-code-regexp "" str)))))
+	  slots
+	  (plist-put slots :extension
+		     (when (string-match extension-regexp str)
+		       (prog1
+			   (string-to-number (match-string 1 str))
+			 (setq str (replace-regexp-in-string
+				    extension-regexp "" str))))))
+
+    (condition-case nil
+	(setq slots (plist-put
+		     slots
+		     :number
+		     (replace-regexp-in-string
+		      "[^[:digit:]]" "" str))))
+    slots))
+
+(defvar ebdb-i18n-german-states
+ '(("Baden-Württemberg" . "BW")
+   ("Bayern" . "BY")
+   ("Berlin" . "BE")
+   ("Brandenburg" . "BB")
+   ("Bremen" . "HB")
+   ("Hamburg" . "HH")
+   ("Hessen" . "HE")
+   ("Mecklenburg-Vorpommern" . "MV")
+   ("Niedersachsen" . "NI")
+   ("Nordrhein-Westfalen" . "NW")
+   ("Rheinland-Pfalz" . "RP")
+   ("Saarland" . "SL")
+   ("Sachsen" . "SN")
+   ("Sachsen-Anhalt" . "ST")
+   ("Schleswig-Holstein" . "SH")
+   ("Thüringen" . "TH"))
+ "All the states in Germany, for use with completion.")
 
 (cl-defmethod ebdb-read-i18n ((_class (subclass ebdb-field-address))
-			      (_cc (eql gbr))
-			      &optional slots _obj)
-  "UK addresses don't need a region."
-  (plist-put slots :region ""))
+			      (_cc (eql deu))
+			      &optional slots obj)
+  (unless (plist-member slots :region)
+    (let ((state (ebdb-with-exit
+		  (ebdb-read-string
+		   "State"
+		   (when obj (ebdb-address-region obj))
+		   ebdb-i18n-german-states t))))
+      (setq slots
+	    (plist-put
+	     slots :region
+	     (if state
+		 (cdr (assoc-string state ebdb-i18n-german-states))
+	       "")))))
+  slots)
+
+(cl-defmethod ebdb-string-i18n ((address ebdb-field-address)
+                                (_cc (eql deu)))
+  (with-slots (streets neighborhood locality region postcode) address
+    (concat
+     (when streets
+       (concat (mapconcat #'identity streets "\n") "\n"))
+     (when postcode
+       (format "%s " postcode))
+     locality
+     "\n"
+     (car-safe (rassq 'deu (ebdb-i18n-countries))))))
 
 ;;; India
 
@@ -242,7 +342,8 @@ number, and any remaining as an extension."
 				(_cc (eql 8)))
   (with-slots (area-code number extension) phone
     (concat
-     "+8 "
+     (unless (eql ebdb-default-phone-country 8)
+      "+8 ")
      (when area-code (format "%d " area-code))
      (apply #'format
 	    (cl-case (length number)
@@ -251,6 +352,17 @@ number, and any remaining as an extension."
 	      (7 "%s%s%s-%s%s-%s%s"))
 	    (split-string number "" t))
      (when extension (format " X%s" extension)))))
+
+;;; Singapore
+
+(cl-defmethod ebdb-read-i18n ((_cls (subclass ebdb-field-address))
+			      (_cc (eql sgp))
+			      &optional slots _obj)
+  "Singapore doesn't have localities, cities, or neighborhoods."
+  (setq slots (plist-put slots :locality "")
+	slots (plist-put slots :neighborhood "")
+	slots (plist-put slots :region ""))
+  slots)
 
 (provide 'ebdb-i18n-basic)
 ;;; ebdb-i18n-basic.el ends here

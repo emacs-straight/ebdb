@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2016-2021  Free Software Foundation, Inc.
 
-;; Version: 0.8.2
+;; Version: 0.8.6
 ;; Package-Requires: ((emacs "25.1") (seq "2.15"))
 
 ;; Maintainer: Eric Abrahamsen <eric@ericabrahamsen.net>
@@ -691,10 +691,23 @@ In rare cases, this may lead to confusion with EBDB's MUA interface."
   :type '(repeat string))
 
 (defcustom ebdb-default-country "Emacs";; what do you mean, it's not a country?
-  "Default country to use if none is specified."
+  "Default country to use for addresses."
   :group 'ebdb-record-edit
   :type '(choice (const :tag "None" nil)
                  (string :tag "Default Country")))
+
+(defcustom ebdb-default-phone-country nil
+  "Default country to use for phone numbers.
+Should be an integer representing the country code for phone
+numbers.
+
+If EBDB can't determine the country when parsing a phone number,
+it will assume this default, if set.  When displaying phone
+numbers, the country code will be omitted if it matches this
+option."
+  :group 'ebdb-record-edit
+  :type '(choice (const :tag "None" nil)
+                 (integer :tag "Default Country")))
 
 (defcustom ebdb-default-user-field 'ebdb-field-notes
   "Default field when editing EBDB records."
@@ -1237,7 +1250,7 @@ process."
   (let* ((field (cl-call-next-method class slots obj))
 	 (labels (symbol-value (oref-default class label-list)))
 	 (human-readable (ebdb-field-readable-name class))
-	 (label (slot-value field 'label)))
+	 (label (when obj (slot-value obj 'label))))
     (setq label (ebdb-with-exit
 		    (ebdb-read-string
 		     (if (stringp human-readable)
@@ -1792,6 +1805,13 @@ Primary sorts before normal sorts before defunct."
     :custom (repeat string)
     :accessor ebdb-address-streets
     :documentation "A list of strings representing the street address(es).")
+   (neighborhood
+    :initarg :neighborhood
+    :type string
+    :initform ""
+    :custom string
+    :accessor ebdb-address-neighborhood
+    :documentation "Smaller area within the locality.")
    (locality
     :initarg :locality
     :type string
@@ -1841,31 +1861,50 @@ Primary sorts before normal sorts before defunct."
 	(locality
 	 (if (plist-member slots :locality)
 	     (plist-get slots :locality)
-	   (ebdb-read-string "Town/City"
-			     (when obj (ebdb-address-locality obj)) ebdb-locality-list)))
+	   (or
+	    (ebdb-with-exit
+	     (ebdb-read-string "Town/City"
+			       (when obj (ebdb-address-locality obj)) ebdb-locality-list))
+	    "")))
+	(neighborhood
+	 (if (plist-member slots :neighborhood)
+	     (plist-get slots :neighborhood)
+	   (or
+	    (ebdb-with-exit
+	     (ebdb-read-string "Neighborhood/Suburb/Zone"
+			       (when obj (ebdb-address-neighborhood obj))))
+	    "")))
 	(region
 	 (if (plist-member slots :region)
 	     (plist-get slots :region)
-	   (ebdb-read-string "State/Province"
-			     (when obj (ebdb-address-region obj)) ebdb-region-list)))
+	   (or (ebdb-with-exit
+		(ebdb-read-string "State/Province"
+				  (when obj (ebdb-address-region obj)) ebdb-region-list))
+	       "")))
 	(postcode
 	 (if (plist-member slots :postcode)
 	     (plist-get slots :postcode)
-	   (ebdb-read-string "Postcode"
-			     (when obj (ebdb-address-postcode obj))
-			     ebdb-postcode-list)))
+	   (or (ebdb-with-exit
+		(ebdb-read-string "Postcode"
+				  (when obj (ebdb-address-postcode obj))
+				  ebdb-postcode-list))
+	       "")))
 	(country
 	 (if (plist-member slots :country)
 	     (plist-get slots :country)
-	   (ebdb-read-string "Country"
-			     (if obj (slot-value obj 'country)
-			       ebdb-default-country)
-			     ebdb-country-list))))
+	   (or
+	    (ebdb-with-exit
+	     (ebdb-read-string "Country"
+			       (if obj (slot-value obj 'country)
+				 ebdb-default-country)
+			       ebdb-country-list))
+	    ""))))
 
     (cl-call-next-method
      class
      `(:streets ,streets
 		:locality ,locality
+		:neighborhood ,neighborhood
 		:label ,(plist-get slots :label)
 		:region ,region
 		:postcode ,postcode
@@ -1879,7 +1918,7 @@ Primary sorts before normal sorts before defunct."
 	(while t
 	  (setq street
 		(ebdb-read-string
-		 (format "Street, line %d: " (1+ n))
+		 (format "Street, line %d" (1+ n))
 		 (nth n streets) ebdb-street-list))
 	  (push street list)
 	  (setq n (1+ n)))
@@ -1897,7 +1936,11 @@ The result looks like this:
               street
               ...
               locality, region postcode
-              country."
+              country.
+
+Note that the neighborhood is not output by default, though it
+may be for certain countries, when using EBDB
+internationalization."
   (let ((country (ebdb-address-country address))
         (streets (ebdb-address-streets address)))
     (when (symbolp country)
@@ -1956,7 +1999,9 @@ The result looks like this:
 	(push number outstring))
       (when area-code
 	(push (format "(%d) " area-code) outstring))
-      (when country-code
+      (when (and country-code
+		 (null (eql country-code
+			    ebdb-default-phone-country)))
 	(push (format "+%d " country-code) outstring))
       (when outstring
 	(apply #'concat outstring)))))
@@ -1996,10 +2041,13 @@ The result looks like this:
       (insert (ebdb-string-trim string))
       (goto-char (point-min))
       (unless (plist-member slots :country-code)
-	(when (looking-at country-regexp)
-	  (setq slots
-		(plist-put slots :country-code (string-to-number (match-string 1))))
-	  (goto-char (match-end 0))))
+	(if (looking-at country-regexp)
+	    (progn
+	      (setq slots
+		    (plist-put slots :country-code (string-to-number (match-string 1))))
+	      (goto-char (match-end 0)))
+	  (when ebdb-default-phone-country
+	    (plist-put slots :country-code ebdb-default-phone-country))))
       (unless (plist-member slots :area-code)
 	(when (looking-at area-regexp)
 	  ;; Bit of a hack.  If we seem to have an area code, but there
@@ -2027,11 +2075,15 @@ The result looks like this:
       ;; number, partially because if it's too long Emacs turns it
       ;; into a float, which is a pain in the ass.
       (when (and (< (point) (point-max))
-		 (re-search-forward (format "\\([^[:blank:]]+\\)\\(%s\\)?"
-					    ext-regexp)))
+		 (re-search-forward
+		  (format "\\([-[:digit:][:blank:]]+\\)\\(%s\\)?[[:blank:]]*\\'"
+			  ext-regexp)))
 	(unless (plist-member slots :number)
 	  (setq slots
-		(plist-put slots :number (match-string 1))))
+		(plist-put
+		 slots :number
+		 (replace-regexp-in-string
+		  "[^[:digit:]]" "" (match-string 1)))))
 	(unless (or (plist-member slots :extension)
 		    (null (match-string 2)))
 	  (setq slots
@@ -2111,7 +2163,7 @@ If optional arg REPLACE is non-nil, replace any existing notes.")
   (setf (slot-value ts slot) (current-time)))
 
 (cl-defmethod ebdb-string ((field ebdb-field-timestamp))
-  (format-time-string ebdb-time-format (slot-value field 'timestamp) t))
+  (format-time-string ebdb-time-format (slot-value field 'timestamp)))
 
 ;;; Creation date field
 
@@ -2134,8 +2186,13 @@ If optional arg REPLACE is non-nil, replace any existing notes.")
    (date
     :initarg :date
     :type list
-    :custom (choice (list integer integer)
-		    (list integer integer integer))
+    :custom (choice (list
+		     (integer :tag "Month")
+		     (integer :tag "Day"))
+		    (list
+		     (integer :tag "Month")
+		     (integer :tag "Day")
+		     (integer :tag "Year")))
     :documentation
     "A list of numbers representing a date, either (month day)
     or (month day year)")
@@ -2156,7 +2213,7 @@ This allows for anniversaries where we don't know the year.
 Eventually this method will go away."
   (when (integerp (plist-get slots :date))
     (setq slots (plist-put slots :date
-			   (calendar
+			   (calendar-gregorian-from-absolute
 			    (plist-get slots :date)))))
   (cl-call-next-method field slots))
 
@@ -2272,7 +2329,8 @@ Eventually this method will go away."
 		    (list
 		     (integer :tag "Month")
 		     (integer :tag "Day")
-		     (integer :tag "Year"))))
+		     (integer :tag "Year")))
+    :initform nil)
    (expiration-date
     :initarg :expiration-date
     :type (or nil list)
@@ -2280,7 +2338,8 @@ Eventually this method will go away."
 		    (list
 		     (integer :tag "Month")
 		     (integer :tag "Day")
-		     (integer :tag "Year")))))
+		     (integer :tag "Year")))
+    :initform nil))
   :human-readable "id number")
 
 (cl-defmethod ebdb-read ((class (subclass ebdb-field-id)) &optional slots obj)

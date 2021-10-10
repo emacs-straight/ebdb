@@ -548,13 +548,24 @@ choice: that formatter should be selected explicitly."
 				    (field ebdb-field-phone)
 				    (_style (eql oneline))
 				    &optional _record)
-  (format "phone (%s)" (ebdb-field-label field)))
+  (let ((label (slot-value field 'label)))
+    ;; Don't use `ebdb-field-label' because if the field has no label,
+    ;; we end up outputting something stupid like "phone (phone)".
+    (concat
+     "phone"
+     (when label
+       (format " (%s)" label)))))
 
 (cl-defmethod ebdb-fmt-field-label ((_fmt ebdb-formatter-ebdb)
 				    (field ebdb-field-address)
 				    (_style (eql oneline))
 				    &optional _record)
-  (format "address (%s)" (ebdb-field-label field)))
+  (let ((label (slot-value field 'label)))
+    ;; As above.
+    (concat
+     "address"
+     (when label
+       (format " (%s)" label)))))
 
 (cl-defmethod ebdb-fmt-field-label ((_fmt ebdb-formatter-ebdb)
 				    (field ebdb-field-relation)
@@ -1155,6 +1166,7 @@ displayed records."
     ("Manipulate database"
      ["Create new record" ebdb-create-record t]
      ["Edit current field" ebdb-edit-field t]
+     ["Edit field (extended)" ebdb-edit-field-customize t]
      ["Insert new field" ebdb-insert-field t]
      ["Edit some field" ebdb-edit-foo t]
      ["Delete record or field" ebdb-delete-field-or-record t]
@@ -1165,7 +1177,7 @@ displayed records."
      ["Reload database" ebdb-reload-database t]
      ["Disable database" ebdb-disable-database t]
      "--"
-     ["Save EBDB" ebdb-save t]
+     ["Save EBDB" ebdb-save-ebdb t]
      ["Revert EBDB" revert-buffer t])
     ("Help"
      ["Brief help" ebdb-help t]
