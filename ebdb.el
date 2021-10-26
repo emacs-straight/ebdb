@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2016-2021  Free Software Foundation, Inc.
 
-;; Version: 0.8.6
+;; Version: 0.8.8
 ;; Package-Requires: ((emacs "25.1") (seq "2.15"))
 
 ;; Maintainer: Eric Abrahamsen <eric@ericabrahamsen.net>
@@ -1854,51 +1854,52 @@ Primary sorts before normal sorts before defunct."
     (ebdb-add-to-list ebdb-postcode-list postcode)))
 
 (cl-defmethod ebdb-read ((class (subclass ebdb-field-address)) &optional slots obj)
-  (let ((streets
-	 (if (plist-member slots :streets)
-	     (plist-get slots :streets)
-	   (ebdb-edit-address-street (when obj (ebdb-address-streets obj)))))
-	(locality
-	 (if (plist-member slots :locality)
-	     (plist-get slots :locality)
-	   (or
-	    (ebdb-with-exit
-	     (ebdb-read-string "Town/City"
-			       (when obj (ebdb-address-locality obj)) ebdb-locality-list))
-	    "")))
-	(neighborhood
-	 (if (plist-member slots :neighborhood)
-	     (plist-get slots :neighborhood)
-	   (or
-	    (ebdb-with-exit
-	     (ebdb-read-string "Neighborhood/Suburb/Zone"
-			       (when obj (ebdb-address-neighborhood obj))))
-	    "")))
-	(region
-	 (if (plist-member slots :region)
-	     (plist-get slots :region)
-	   (or (ebdb-with-exit
-		(ebdb-read-string "State/Province"
-				  (when obj (ebdb-address-region obj)) ebdb-region-list))
-	       "")))
-	(postcode
-	 (if (plist-member slots :postcode)
-	     (plist-get slots :postcode)
-	   (or (ebdb-with-exit
-		(ebdb-read-string "Postcode"
-				  (when obj (ebdb-address-postcode obj))
-				  ebdb-postcode-list))
-	       "")))
-	(country
-	 (if (plist-member slots :country)
-	     (plist-get slots :country)
-	   (or
-	    (ebdb-with-exit
-	     (ebdb-read-string "Country"
-			       (if obj (slot-value obj 'country)
-				 ebdb-default-country)
-			       ebdb-country-list))
-	    ""))))
+  (let* ((ebdb-read-string-override '("Address" . prepend))
+	 (streets
+	  (if (plist-member slots :streets)
+	      (plist-get slots :streets)
+	    (ebdb-edit-address-street (when obj (ebdb-address-streets obj)))))
+	 (locality
+	  (if (plist-member slots :locality)
+	      (plist-get slots :locality)
+	    (or
+	     (ebdb-with-exit
+	      (ebdb-read-string "Town/City"
+				(when obj (ebdb-address-locality obj)) ebdb-locality-list))
+	     "")))
+	 (neighborhood
+	  (if (plist-member slots :neighborhood)
+	      (plist-get slots :neighborhood)
+	    (or
+	     (ebdb-with-exit
+	      (ebdb-read-string "Neighborhood/Suburb/Zone"
+				(when obj (ebdb-address-neighborhood obj))))
+	     "")))
+	 (region
+	  (if (plist-member slots :region)
+	      (plist-get slots :region)
+	    (or (ebdb-with-exit
+		 (ebdb-read-string "State/Province"
+				   (when obj (ebdb-address-region obj)) ebdb-region-list))
+		"")))
+	 (postcode
+	  (if (plist-member slots :postcode)
+	      (plist-get slots :postcode)
+	    (or (ebdb-with-exit
+		 (ebdb-read-string "Postcode"
+				   (when obj (ebdb-address-postcode obj))
+				   ebdb-postcode-list))
+		"")))
+	 (country
+	  (if (plist-member slots :country)
+	      (plist-get slots :country)
+	    (or
+	     (ebdb-with-exit
+	      (ebdb-read-string "Country"
+				(if obj (slot-value obj 'country)
+				  ebdb-default-country)
+				ebdb-country-list))
+	     ""))))
 
     (cl-call-next-method
      class
@@ -1923,7 +1924,9 @@ Primary sorts before normal sorts before defunct."
 	  (push street list)
 	  (setq n (1+ n)))
       ((ebdb-empty quit) nil))
-    (reverse list)))
+    (if list
+	(reverse list)
+      (signal 'ebdb-empty (list 'ebdb-field-address)))))
 
 (cl-defmethod ebdb-string ((address ebdb-field-address))
   (funcall ebdb-default-address-format-function address))
@@ -2007,7 +2010,8 @@ internationalization."
 	(apply #'concat outstring)))))
 
 (cl-defmethod ebdb-read ((class (subclass ebdb-field-phone)) &optional slots obj)
-  (let* ((country
+  (let* ((ebdb-read-string-override '("Phone" . prepend))
+	 (country
 	  (or (and obj
 		   (slot-value obj 'country-code))
 	      (plist-get slots :country-code)))
@@ -2022,8 +2026,7 @@ internationalization."
 		  ;; Why aren't we allowing them to change the area
 		  ;; code?
 		  (when area
-		    (format " (%d)" area))
-		  ": "))
+		    (format " (%d)" area))))
 	 (default (when obj (slot-value obj 'number))))
     (ebdb-error-retry
      (ebdb-parse class
@@ -4557,13 +4560,15 @@ that class, or its subclasses.  If PROMPT is given, use that as
 the prompt."
   (let* ((recs (or records (ebdb-records)))
 	 (pairs
-	  (mapcar
+	  (mapcan
 	   (lambda (r)
-	     ;; This is bad, doesn't take into account all the
-	     ;; different strings that might be used to find a record.
-	     (cons
-	      (ebdb-string r)
-	      (ebdb-record-uuid r)))
+	     (mapcar
+	      (lambda (s)
+		(cons s (ebdb-record-uuid r)))
+	      (delete-dups
+	       (cons
+		(ebdb-string r)
+		(ebdb-record-alt-names r)))))
 	   (if class
 	       (seq-filter
 		(lambda (r)
@@ -4983,9 +4988,9 @@ same meaning as in `completing-read'."
 	 (pcase ebdb-read-string-override
 	   (`,(and str (pred stringp)) str)
 	   (`(,str . append)
-	    (concat str " " prompt))
-	   (`(,str . prepend)
 	    (concat prompt " " str))
+	   (`(,str . prepend)
+	    (concat str " " (downcase prompt)))
 	   (_ prompt))
 	 ": "))
   (ebdb-string-trim
