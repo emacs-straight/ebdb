@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2016-2021  Free Software Foundation, Inc.
 
-;; Version: 0.8.10
+;; Version: 0.8.12
 ;; Package-Requires: ((emacs "25.1") (seq "2.15"))
 
 ;; Maintainer: Eric Abrahamsen <eric@ericabrahamsen.net>
@@ -320,6 +320,7 @@ called with two arguments: the image field and the record.  The
 function should return either a filename, or actual image data."
   :group 'ebdb-record-edit
   :type '(choice (const :tag "Use built-in function" nil)
+		 (string :tag "File name")
                  (const name)
 		 (const fl-name)
 		 (const lf-name)))
@@ -962,7 +963,15 @@ Test for presence is done with `equal'."
     :initform nil
     :documentation
     "A list of actions which this field can perform.  Each list
-  element is a cons of string name and function name."))
+  element is a cons of string name and function name.")
+   (comment
+    :type (or null string)
+    :custom (choice (const :tag "No comment" nil)
+		    (string :tag "Comment"))
+    :initarg :comment
+    :initform nil
+    :documentation
+    "Arbitrary comment on this field value"))
   :abstract t :documentation "Abstract class for EBDB fields.
   Subclass this to produce real field types.")
 
@@ -2119,6 +2128,7 @@ internationalization."
   ((notes
     :type string
     :initarg :notes
+    :custom string
     :initform ""
     :documentation "User notes on this contact."))
   :human-readable "notes")
@@ -3268,13 +3278,21 @@ there is no timezone value."
 This function returns an actual image, suitable for display with
 `insert-image'."
   (let* ((image-slot (slot-value field 'image))
+	 (name-instance (slot-value record 'name))
 	 (image
 	  (cond ((stringp image-slot)
 		 image-slot)
-		((eq image-slot 'name)
-		 (ebdb-string record))
+		((memq image-slot '(name fl-name lf-name))
+		 (cond ((or (eq image-slot 'name)
+			    (null (cl-typep name-instance
+					    'ebdb-field-name-complex)))
+			(ebdb-string name-instance))
+		       ((eq image-slot 'lf-name)
+			(ebdb-name-lf name-instance))
+		       ((eq image-slot 'fl-name)
+			(ebdb-name-fl name-instance))))
 		(t
-		 (ebdb-field-image-function ebdb-image record)))))
+		 (ebdb-field-image-function field record)))))
     (when image
       (create-image
        (if (stringp image)
