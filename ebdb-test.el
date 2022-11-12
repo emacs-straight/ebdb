@@ -1,6 +1,6 @@
 ;;; ebdb-test.el --- Tests for EBDB                  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2017  Free Software Foundation, Inc.
+;; Copyright (C) 2017-2022  Free Software Foundation, Inc.
 
 ;; Author: Eric Abrahamsen <eric@ericabrahamsen.net>
 
@@ -360,6 +360,11 @@ If it doesn't exist, raise `ebdb-related-unfound'."
 	   "Murakami"))
   (should (equal
 	   (slot-value
+	    (ebdb-parse 'ebdb-field-name-complex "John Reddemann")
+	    'surname)
+	   "Reddemann"))
+  (should (equal
+	   (slot-value
 	    (ebdb-parse 'ebdb-field-name-complex "Fintan O'Toole")
 	    'surname)
 	   "O'Toole"))
@@ -586,7 +591,7 @@ If it doesn't exist, raise `ebdb-related-unfound'."
   (should (equal (ebdb-vcard-escape "Marry\\n uncle!")
 		 "Marry\\n uncle!"))
 
-  (should (equal (ebdb-vcard-escape "Mine 
+  (should (equal (ebdb-vcard-escape "Mine
 uncle")
 		 "Mine \\nuncle"))
 
@@ -594,7 +599,7 @@ uncle")
 		 "Marry, nuncle!"))
 
   (should (equal (ebdb-vcard-unescape "Marry \\nuncle")
-		 "Marry 
+		 "Marry
 uncle"))
 
   (should (equal (ebdb-vcard-unescape
