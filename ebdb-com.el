@@ -128,7 +128,8 @@ create roles for those records, etc."
   :group 'faces)
 
 (defcustom ebdb-name-face-alist '((ebdb-record-person . ebdb-person-name)
-				  (ebdb-record-organization . ebdb-organization-name))
+				  (ebdb-record-organization . ebdb-organization-name)
+				  (ebdb-record-mailing-list . ebdb-mailing-list-name))
   "Alist of record class types to the face names.
 Faces are used to font-lock their names in the *EBDB* buffer."
   :type '(repeat (cons (ebdb-record :tag "Record type") (face :tag "Face"))))
@@ -141,6 +142,11 @@ Faces are used to font-lock their names in the *EBDB* buffer."
 (defface ebdb-organization-name
   '((t (:inherit font-lock-type-face)))
   "Face used for EBDB organization names."
+  :group 'ebdb-faces)
+
+(defface ebdb-mailing-list-name
+  '((t (:inherit font-lock-constant-face)))
+  "Face used for EBDB mailing list names."
   :group 'ebdb-faces)
 
 (defface ebdb-marked
@@ -1262,8 +1268,9 @@ popped up from."
       (if (not (or split-window size))
 	  ;; Not splitting, but buffer isn't visible, just take up
 	  ;; the whole window.
-	  (pop-to-buffer-same-window buf)
-	(setq buffer-window (get-buffer-window buf t))
+	  (progn
+	    (pop-to-buffer-same-window buf)
+	    (setq buffer-window (get-buffer-window buf t)))
 	;; Otherwise split.
 	(setq
 	 buffer-window
