@@ -1,6 +1,6 @@
 ;;; ebdb-vcard.el --- vCard export and import routine for EBDB  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2016-2022  Free Software Foundation, Inc.
+;; Copyright (C) 2016-2023  Free Software Foundation, Inc.
 
 ;; Author: Eric Abrahamsen <eric@ericabrahamsen.net>
 
@@ -330,11 +330,11 @@ method is just responsible for formatting the record name."
   (with-slots (priority) mail
     (concat
      (cl-call-next-method)
-     (cl-case priority
+     (pcase priority
        ('primary ";PREF=1")
        ('normal ";PREF=10")
        ('defunct ";PREF=100")
-       (t "")))))
+       (_ "")))))
 
 (cl-defmethod ebdb-fmt-field-label ((_f ebdb-formatter-vcard)
 			 	    (field ebdb-field-labeled)

@@ -1,6 +1,6 @@
 ;;; ebdb-wl.el --- EBDB interface to Wanderlust  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2017-2022  Free Software Foundation, Inc.
+;; Copyright (C) 2017-2023  Free Software Foundation, Inc.
 
 ;; Author: Eric Abrahamsen <eric@ericabrahamsen.net>
 
@@ -134,14 +134,18 @@ beginning) of the signature separator."
       (when win
 	(quit-window nil win)))))
 
+;;;###autoload
 (defun ebdb-insinuate-wl ()
   "Hook EBDB into Wanderlust."
+  (unless ebdb-db-list
+    (ebdb-load))
   (define-key wl-summary-mode-map ";" ebdb-mua-keymap)
   (define-key mime-view-mode-default-map ";" ebdb-mua-keymap)
   (when ebdb-complete-mail
     (define-key wl-draft-mode-map (kbd "TAB") #'ebdb-complete-mail))
   (add-hook 'wl-summary-exit-hook #'ebdb-wl-quit-window))
 
+;;;###autoload
 (defun ebdb-wl-auto-update ()
   (ebdb-mua-auto-update ebdb-wl-auto-update-p))
 

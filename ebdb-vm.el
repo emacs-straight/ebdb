@@ -1,6 +1,6 @@
 ;;; ebdb-vm.el --- EBDB interface to VM              -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2016-2022  Free Software Foundation, Inc.
+;; Copyright (C) 2016-2023  Free Software Foundation, Inc.
 
 ;; Author: Eric Abrahamsen <eric@ericabrahamsen.net>
 
@@ -369,6 +369,8 @@ from different senders."
 ;;;###autoload
 (defun ebdb-insinuate-vm ()
   "Hook EBDB into VM."
+  (unless ebdb-db-list
+    (ebdb-load))
   (define-key vm-mode-map ";" ebdb-mua-keymap)
   (define-key vm-mode-map "/" 'ebdb)
   ;; `mail-mode-map' is the parent of `vm-mail-mode-map'.
@@ -399,6 +401,7 @@ from different senders."
             ;; the EBDB record of the sender.
             (lambda (m) (ebdb-mua-summary-mark (vm-su-from m))))))
 
+;;;###autoload
 (defun ebdb-vm-auto-update ()
   (ebdb-mua-auto-update ebdb-vm-auto-update-p))
 

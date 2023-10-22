@@ -1,6 +1,6 @@
 ;;; ebdb-rmail.el --- EBDB interface to Rmail        -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2016-2022  Free Software Foundation, Inc.
+;; Copyright (C) 2016-2023  Free Software Foundation, Inc.
 
 ;; Author: Eric Abrahamsen <eric@ericabrahamsen.net>
 
@@ -79,10 +79,14 @@ the value of `ebdb-default-window-size'."
 (cl-defmethod ebdb-popup-buffer (&context (major-mode rmail-summary-mode))
   (list (get-buffer-window) ebdb-rmail-window-size))
 
+;;;###autoload
 (defun ebdb-insinuate-rmail ()
   "Hook EBDB into RMAIL."
+  (unless ebdb-db-list
+    (ebdb-load))
   (define-key rmail-mode-map ";" ebdb-mua-keymap))
 
+;;;###autoload
 (defun ebdb-rmail-auto-update ()
   (ebdb-mua-auto-update ebdb-rmail-auto-update-p))
 

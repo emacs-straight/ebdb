@@ -1,6 +1,6 @@
 ;;; ebdb-migrate.el --- Migration/upgrade functions for EBDB  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2016-2022  Free Software Foundation, Inc.
+;; Copyright (C) 2016-2023  Free Software Foundation, Inc.
 
 ;; Author: Eric Abrahamsen <eric@ericabrahamsen.net>
 
@@ -671,7 +671,7 @@ BBDB sets the default of that option."
           (setq migrate (< file-format ebdb-file-format)))
 	(unless (re-search-forward "^\\[" nil t)
 	  (error "Unreadabe BBDB file: no contacts found"))
-	(goto-char (point-at-bol))
+	(goto-char (line-beginning-position))
         ;; narrow the buffer to skip over the rubbish before the first record.
         (narrow-to-region (point) (point-max))
         (let ((modp (buffer-modified-p))

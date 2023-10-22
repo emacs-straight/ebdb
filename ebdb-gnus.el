@@ -1,6 +1,6 @@
 ;;; ebdb-gnus.el --- Gnus interface to EBDB          -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2016-2022  Free Software Foundation, Inc.
+;; Copyright (C) 2016-2023  Free Software Foundation, Inc.
 
 ;; Author: Eric Abrahamsen <eric@ericabrahamsen.net>
 
@@ -336,8 +336,11 @@ composed to a certain record."
 	    (apply #'message-mail (ebdb-dwim-mail record mail) args)))
       (cl-call-next-method))))
 
+;;;###autoload
 (defun ebdb-insinuate-gnus ()
   "Hook EBDB into Gnus."
+  (unless ebdb-db-list
+    (ebdb-load))
   ;; `ebdb-mua-display-sender' fails in *Article* buffers, where
   ;; `gnus-article-read-summary-keys' provides an additional wrapper
   ;; that restores the window configuration.

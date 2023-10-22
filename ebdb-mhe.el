@@ -1,6 +1,6 @@
 ;;; ebdb-mhe.el --- EBDB interface to mh-e           -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2016-2022  Free Software Foundation, Inc.
+;; Copyright (C) 2016-2023  Free Software Foundation, Inc.
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -137,13 +137,17 @@ Returns the empty string if HEADER is not in the message."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;###autoload
 (defun ebdb-insinuate-mh ()
   "Hook EBDB into MH-E."
+  (unless ebdb-db-list
+    (ebdb-load))
   (define-key mh-folder-mode-map ";" ebdb-mua-keymap)
   (when ebdb-complete-mail
-      (define-key mh-letter-mode-map "\M-;" 'ebdb-complete-mail)
-      (define-key mh-letter-mode-map "\e\t" 'ebdb-complete-mail)))
+    (define-key mh-letter-mode-map "\M-;" 'ebdb-complete-mail)
+    (define-key mh-letter-mode-map "\e\t" 'ebdb-complete-mail)))
 
+;;;###autoload
 (defun ebdb-mhe-auto-update ()
   (ebdb-mua-auto-update ebdb-mhe-auto-update-p))
 

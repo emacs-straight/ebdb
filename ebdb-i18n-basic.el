@@ -1,6 +1,6 @@
 ;;; ebdb-i18n-basic.el --- Basic internationalization methods for EBDB  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2017-2022  Free Software Foundation, Inc.
+;; Copyright (C) 2017-2023  Free Software Foundation, Inc.
 
 ;; Author: Eric Abrahamsen <eric@ericabrahamsen.net>
 
@@ -235,12 +235,11 @@ itself."
 			 (setq str (replace-regexp-in-string
 				    extension-regexp "" str))))))
 
-    (condition-case nil
-	(setq slots (plist-put
-		     slots
-		     :number
-		     (replace-regexp-in-string
-		      "[^[:digit:]]" "" str))))
+    (setq slots (plist-put
+		 slots
+		 :number
+		 (replace-regexp-in-string
+		  "[^[:digit:]]" "" str)))
     slots))
 
 (defvar ebdb-i18n-german-states

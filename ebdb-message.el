@@ -1,6 +1,6 @@
 ;;; ebdb-message.el --- EBDB interface to mail composition packages  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2016-2022  Free Software Foundation, Inc.
+;; Copyright (C) 2016-2023  Free Software Foundation, Inc.
 
 ;; Author: Eric Abrahamsen <eric@ericabrahamsen.net>
 
@@ -120,6 +120,8 @@ Also fires when postponing a draft."
 
 (defun ebdb-insinuate-message ()
   ;; We don't currently bind the `ebdb-mua-keymap'.
+  (unless ebdb-db-list
+    (ebdb-load))
   (pcase ebdb-complete-mail
     ('capf (progn (add-hook
 		   'completion-at-point-functions
@@ -149,9 +151,12 @@ Also fires when postponing a draft."
   ;; do the undisplay manually.
   (ebdb-undisplay-records))
 
+;;;###autoload
 (defun ebdb-insinuate-mail ()
   "Hook EBDB into Mail Mode."
   ;; We don't currently bind the `ebdb-mua-keymap'.
+  (unless ebdb-db-list
+    (ebdb-load))
   (pcase ebdb-complete-mail
     ('capf (progn (add-hook
 		   'completion-at-point-functions
@@ -171,16 +176,17 @@ Also fires when postponing a draft."
 
   (ebdb-undisplay-records))
 
+;;;###autoload
 (defun ebdb-message-auto-update ()
   (ebdb-mua-auto-update ebdb-message-auto-update-p))
 
 (defun ebdb-message-display-only ()
   (ebdb-mua-auto-update 'existing))
 
-(add-hook 'message-mode-hook 'ebdb-insinuate-message)
-(add-hook 'mail-setup-hook 'ebdb-insinuate-mail)
-(add-hook 'message-send-hook 'ebdb-message-auto-update)
-(add-hook 'mail-send-hook 'ebdb-message-auto-update)
+(add-hook 'message-mode-hook #'ebdb-insinuate-message)
+(add-hook 'mail-setup-hook #'ebdb-insinuate-mail)
+(add-hook 'message-send-hook #'ebdb-message-auto-update)
+(add-hook 'mail-send-hook #'ebdb-message-auto-update)
 
 (provide 'ebdb-message)
 ;;; ebdb-message.el ends here

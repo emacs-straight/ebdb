@@ -1,6 +1,6 @@
 ;;; ebdb-mu4e.el --- EBDB interface for mu4e         -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2016-2022  Free Software Foundation, Inc.
+;; Copyright (C) 2016-2023  Free Software Foundation, Inc.
 
 ;; Author: Eric Abrahamsen <eric@ericabrahamsen.net>
 
@@ -67,9 +67,12 @@ the value of `ebdb-default-window-size'."
 (cl-defmethod ebdb-popup-window (&context (major-mode mu4e-view-mode))
   (list (get-buffer-window) ebdb-mu4e-window-size))
 
+;;;###autoload
 (defun ebdb-insinuate-mu4e ()
   "Hook EBDB into mu4e."
   ;; Tackle headers later
+  (unless ebdb-db-list
+    (ebdb-load))
   (define-key mu4e-view-mode-map ";" ebdb-mua-keymap)
   (add-hook 'message-sent-hook
 	    (lambda ()

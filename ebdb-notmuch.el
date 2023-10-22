@@ -1,6 +1,6 @@
 ;;; ebdb-notmuch.el --- EBDB interface to Notmuch    -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2019-2022  Free Software Foundation, Inc.
+;; Copyright (C) 2019-2023  Free Software Foundation, Inc.
 
 ;; Author: Eric Abrahamsen <eric@ericabrahamsen.net>
 ;; Maintainer: Eric Abrahamsen <eric@ericabrahamsen.net>
@@ -62,12 +62,18 @@ the value of `ebdb-default-window-size'."
 (cl-defmethod ebdb-popup-window (&context (major-mode notmuch-show-mode))
   (list (get-buffer-window) ebdb-notmuch-window-size))
 
+;;;###autoload
 (defun ebdb-insinuate-notmuch-show ()
   "Hook EBDB into Notmuch's `notmuch-show-mode'."
+  (unless ebdb-db-list
+    (ebdb-load))
   (define-key notmuch-show-mode-map ";" ebdb-mua-keymap))
 
+;;;###autoload
 (defun ebdb-insinuate-notmuch-message ()
   "Hook EBDB into Notmuch's `notmuch-message-mode'."
+  (unless ebdb-db-list
+    (ebdb-load))
   (when ebdb-complete-mail
     (define-key notmuch-message-mode-map (kbd "TAB") #'ebdb-complete-mail)))
 

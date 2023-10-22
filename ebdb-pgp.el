@@ -1,6 +1,6 @@
 ;;; ebdb-pgp.el --- Interaction between EBDB and PGP  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2016-2022  Free Software Foundation, Inc.
+;; Copyright (C) 2016-2023  Free Software Foundation, Inc.
 
 ;; Author: Eric Abrahamsen <eric@ericabrahamsen.net>
 
@@ -161,8 +161,8 @@ reasons why.  Instead, you might want to call the command
 If you do decide to set up automatic signing/encryption hooks,
 use one of the following, as appropriate:
 
- (add-hook 'message-send-hook #'ebdb-pgp)
- (add-hook 'mail-send-hook #'ebdb-pgp)"
+ (add-hook \\='message-send-hook #\\='ebdb-pgp)
+ (add-hook \\='mail-send-hook #\\='ebdb-pgp)"
   (interactive)
   (save-excursion
     (save-restriction
