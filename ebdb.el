@@ -1204,11 +1204,12 @@ chance to react somehow.  TYPE is one of the symbols \\='sender or
 in."
   nil)
 
-;; See actual implementation down below `ebdb-field-user' definition.
 (cl-defgeneric ebdb-field-compare (field1 field2)
   "Return non-nil if FIELD1 should be sorted before FIELD2."
-  (:method (_field1 _field2)
-	   nil))
+  (:method ((field1 ebdb-field)
+	    (field2 ebdb-field))
+	   (string< (symbol-name (eieio-object-class-name field1))
+		    (symbol-name (eieio-object-class-name field2)))))
 
 
 ;;; The UUID field.
@@ -1351,12 +1352,6 @@ process."
   `ebdb-field-user-simple', can subclass this class.  Any field
   class that subclasses this will be offered as a choice to the
   user when inserting new fields.")
-
-(cl-defmethod ebdb-field-compare ((field1 ebdb-field-user)
-				  (field2 ebdb-field-user))
-  "By default, order by field class."
-  (string< (symbol-name (eieio-object-class-name field1))
-	   (symbol-name (eieio-object-class-name field2))))
 
 (defvar ebdb-user-label-list nil
   "List of existing labels of user fields.")
@@ -3710,18 +3705,20 @@ FIELD."
 
 (cl-defmethod ebdb-init-field ((name ebdb-field-name-simple)
 			       (record ebdb-record-person))
-  (ebdb-pushnew
-   (format "%s %s"
-	   (ebdb-string name)
-	   (ebdb-name-last (slot-value record 'name)))
-   (ebdb-record-alt-names record))
-  ;; FIXME: Also add nickname-plus-surname to the hashtable.
+  (let ((nick-and-surname
+	 (format "%s %s"
+	    (ebdb-string name)
+	    (ebdb-record-lastname record))))
+    (ebdb-pushnew
+     nick-and-surname
+     (ebdb-record-alt-names record))
+    (ebdb-puthash nick-and-surname record))
   (cl-call-next-method))
 
 (cl-defmethod ebdb-init-field ((name ebdb-field-name-simple)
 			       (record ebdb-record-person))
   "Add a \"nickname-plus-lastname\" to the hash table."
-  (when-let ((last-name (ebdb-record-lastname record)))
+  (when-let* ((last-name (ebdb-record-lastname record)))
     (ebdb-puthash (concat (ebdb-string name) " " last-name)
 		  record))
   (cl-call-next-method))
